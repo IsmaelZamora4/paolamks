@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Farmacéuticos Markos — Panel Paola</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -59,9 +59,23 @@
         <div class="dashboard-grid">
           <div class="dashboard-main">
             <div class="kpi-row">
-              <div class="kpi-card primary"><div class="kpi-label">Ventas del mes</div><div id="totalMonth" class="kpi-value">S/0.00</div></div>
-              <div class="kpi-card"><div class="kpi-label">Clientes activos</div><div id="activeClients" class="kpi-value">0</div><div class="kpi-sub">compraron en los últimos 30 días</div></div>
-              <div class="kpi-card warn-card"><div class="kpi-label">Alertas activas</div><div id="alertsCount" class="kpi-value">0</div><div class="kpi-sub">requieren atención</div></div>
+              <div class="kpi-card primary" style="position: relative;">
+                <button class="detail-eye-btn" id="viewVentasDetail" title="Ver detalle de ventas del mes">👁️</button>
+                <div class="kpi-label">Ventas del mes</div>
+                <div id="totalMonth" class="kpi-value">S/0.00</div>
+              </div>
+              <div class="kpi-card" style="position: relative;">
+                <button class="detail-eye-btn" id="viewClientesActivosDetail" title="Ver clientes activos">👁️</button>
+                <div class="kpi-label">Clientes activos</div>
+                <div id="activeClients" class="kpi-value">0</div>
+                <div class="kpi-sub">compraron en los últimos 30 días</div>
+              </div>
+              <div class="kpi-card warn-card" style="position: relative;">
+                <button class="detail-eye-btn" id="viewAlertasDetail" title="Ver alertas activas">👁️</button>
+                <div class="kpi-label">Alertas activas</div>
+                <div id="alertsCount" class="kpi-value">0</div>
+                <div class="kpi-sub">requieren atención</div>
+              </div>
             </div>
             <div class="section-card">
               <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
@@ -78,22 +92,61 @@
         </div>
       </section>
 
-      <!-- REGISTRAR VENTA -->
-      <section id="register" class="view hidden">
-        <div class="form-card">
-          <h2 class="form-title">Registrar Venta</h2>
-          <form id="saleForm" class="sale-form">
-            <div class="form-grid">
-              <label class="form-label">Cliente <select id="clientSelect" class="form-control"></select></label>
-              <label class="form-label">Producto <select id="productSelect" class="form-control"></select></label>
-              <label class="form-label">Imagen del producto <div id="productSaleImagePreview" class="image-preview" style="width: 100px; height: 100px; margin-top: 5px;"><img id="productSaleImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label>
-              <label class="form-label">Precio (editable o automático) <div class="price-input-group"><input id="priceField" type="number" step="0.01" min="0.01" class="form-control" placeholder="Editar o cargar automático" /><button id="autoPriceBtn" type="button" class="btn-icon" title="Usar precio automático">🔄</button></div></label>
-              <label class="form-label">Cantidad <input id="cantidadField" type="number" step="1" min="1" value="1" required class="form-control" /></label>
-              <label class="form-label">Lote <input id="loteField" type="text" maxlength="50" class="form-control" placeholder="Ej: LT-2024-001" /></label>
-              <label class="form-label">Fecha de vencimiento <input id="vencimientoField" type="date" class="form-control" /></label>
+      <!-- MODALES DE DETALLE PROFESIONALES (ventas, clientes activos, alertas) -->
+      <div id="detailVentasModal" class="modal pro-modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content pro-modal-content">
+          <div class="modal-header pro-modal-header">
+            <h3>📊 Detalle de Ventas del Mes</h3>
+            <button class="modal-close" id="closeVentasModal">&times;</button>
+          </div>
+          <div class="modal-body pro-modal-body">
+            <div class="pro-summary-card">
+              <div class="pro-summary-item"><span class="pro-summary-label">Mes actual</span><span class="pro-summary-value" id="ventasMesLabel">-</span></div>
+              <div class="pro-summary-item"><span class="pro-summary-label">Total ventas</span><span class="pro-summary-value" id="ventasTotalGeneral">S/0.00</span></div>
+              <div class="pro-summary-item"><span class="pro-summary-label">Transacciones</span><span class="pro-summary-value" id="ventasCount">0</span></div>
             </div>
-            <div class="form-actions"><button type="submit" class="btn primary">Guardar venta</button><span id="saleMessage" class="form-message"></span></div>
-          </form>
+            <div class="pro-table-wrapper"><table class="pro-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Precio Unit.</th><th>Total</th><th>Fecha</th></tr></thead><tbody id="ventasDetalleTable"></tbody></table></div>
+          </div>
+          <div class="modal-footer pro-modal-footer"><button id="closeVentasModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
+        </div>
+      </div>
+      <div id="detailClientesActivosModal" class="modal pro-modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content pro-modal-content">
+          <div class="modal-header pro-modal-header"><h3>👥 Clientes Activos (últimos 30 días)</h3><button class="modal-close" id="closeClientesActivosModal">&times;</button></div>
+          <div class="modal-body pro-modal-body"><div class="pro-table-wrapper"><table class="pro-table"><thead><tr><th>Cliente</th><th>Última compra</th><th>Compras (30d)</th><th>Monto (30d)</th></tr></thead><tbody id="clientesActivosTable"></tbody></table></div></div>
+          <div class="modal-footer pro-modal-footer"><button id="closeClientesActivosModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
+        </div>
+      </div>
+      <div id="detailAlertasModal" class="modal pro-modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content pro-modal-content">
+          <div class="modal-header pro-modal-header"><h3>⚠️ Alertas Activas</h3><button class="modal-close" id="closeAlertasModal">&times;</button></div>
+          <div class="modal-body pro-modal-body"><div class="alerts-grid"><div class="alert-card warning-card"><div class="alert-card-header">⚠️ Advertencias</div><ul id="modalWarningList" class="alert-list-custom"></ul></div><div class="alert-card danger-card"><div class="alert-card-header">🔴 Urgentes</div><ul id="modalDangerList" class="alert-list-custom"></ul></div></div></div>
+          <div class="modal-footer pro-modal-footer"><button id="closeAlertasModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
+        </div>
+      </div>
+
+      <!-- REGISTRAR VENTA MÚLTIPLE -->
+      <section id="register" class="view hidden">
+        <div class="form-card" style="max-width: 100%;">
+          <h2 class="form-title">Registrar Venta Múltiple</h2>
+          <div class="form-grid" style="grid-template-columns: 1fr;">
+            <label class="form-label">Cliente
+              <select id="clientSelect" class="form-control"></select>
+            </label>
+          </div>
+          <div id="productTableContainer" style="margin-top: 20px; overflow-x: auto; width: 100%;">
+            <table class="table" id="salesBatchTable" style="min-width: 1000px; width: 100%; white-space: nowrap;">
+              <thead><tr><th>Imagen</th><th>Producto</th><th>Presentación</th><th>Precio (S/)</th><th>Cantidad</th><th>Lote</th><th>Vencimiento</th><th>Seleccionar</th></tr></thead>
+              <tbody id="batchTableBody"><tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td></tr></tbody>
+            </table>
+          </div>
+          <div class="form-actions" style="margin-top: 20px;">
+            <button id="registerBatchBtn" type="button" class="btn primary">Registrar ventas seleccionadas</button>
+            <span id="batchMessage" class="form-message"></span>
+          </div>
         </div>
       </section>
 
@@ -105,87 +158,75 @@
         </div>
       </section>
 
-      <!-- CLIENTES -->
-      <section id="clients" class="view hidden"><div class="section-card"><h2 class="form-title">Clientes</h2><div id="clientsGrid" class="clients-grid"></div></div></section>
-
-      <!-- PRODUCTOS -->
-      <section id="products" class="view hidden">
-        <div class="section-card"><div class="products-header"><h2 class="form-title">Productos</h2><button id="uploadImagesBtn" class="btn primary" title="Subir imágenes a Firebase">📤 Subir Imágenes</button></div><div id="productsGrid" class="products-grid"></div></div>
+      <!-- CLIENTES (con botón nuevo cliente) -->
+      <section id="clients" class="view hidden">
+        <div class="section-card">
+          <div class="products-header">
+            <h2 class="form-title">Clientes</h2>
+            <button id="addClientBtn" class="btn primary">➕ Nuevo Cliente</button>
+          </div>
+          <div id="clientsGrid" class="clients-grid"></div>
+        </div>
       </section>
 
-      <!-- MODALES -->
-      <div id="uploadModal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content">
-          <div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div>
-          <div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div>
-          <div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div>
-        </div>
-      </div>
-
-      <div id="productDetailModal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
-          <div class="modal-header"><h3>Detalles del Producto</h3><button class="modal-close" id="closeDetailModal">&times;</button></div>
-          <div class="modal-body">
-            <div id="productImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="productDetailImg" src="" alt="producto" /></div>
-            <label class="form-label">URL de la Imagen <input id="productDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label>
-            <div id="detailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="detailPreviewImg" src="" alt="preview" /></div>
-            <label class="form-label">Nombre del Producto <input id="productDetailName" type="text" maxlength="100" class="form-control" /></label>
-            <label class="form-label">Presentación <input id="productDetailPresentation" type="text" maxlength="100" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label>
-            <label class="form-label">Detalle / Descripción <textarea id="productDetailDescription" class="form-control" rows="4" style="resize: vertical; font-family: inherit;"></textarea></label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;"><label class="form-label">VVF <input type="text" class="form-control" id="productDetailVVF" readonly style="opacity: 0.6;" /></label><label class="form-label">PVF <input type="text" class="form-control" id="productDetailPVF" readonly style="opacity: 0.6;" /></label></div>
-            <span id="detailMessage" class="form-message"></span>
+      <!-- PRODUCTOS (con botón nuevo producto) -->
+      <section id="products" class="view hidden">
+        <div class="section-card">
+          <div class="products-header">
+            <h2 class="form-title">Productos</h2>
+            <div style="display: flex; gap: 10px;">
+              <button id="uploadImagesBtn" class="btn primary" title="Subir imágenes a Firebase">📤 Subir Imágenes</button>
+              <button id="addProductBtn" class="btn primary">➕ Nuevo Producto</button>
+            </div>
           </div>
-          <div class="modal-footer"><button id="cancelDetailBtn" class="btn secondary">Cancelar</button><button id="saveDetailBtn" class="btn primary">Guardar Cambios</button></div>
+          <div id="productsGrid" class="products-grid"></div>
         </div>
-      </div>
+      </section>
 
-      <div id="clientDetailModal" class="modal hidden">
+      <!-- MODAL AGREGAR CLIENTE -->
+      <div id="addClientModal" class="modal hidden">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
-          <div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div>
+        <div class="modal-content" style="max-width: 600px;">
+          <div class="modal-header"><h3>➕ Nuevo Cliente</h3><button class="modal-close" id="closeAddClientModal">&times;</button></div>
           <div class="modal-body">
-            <div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div>
-            <label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label>
-            <div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div>
-            <label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label>
-            <label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label>
-            <label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label>
-            <label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label>
-            <span id="clientDetailMessage" class="form-message"></span>
+            <label class="form-label">Nombre del Cliente <input type="text" id="newClientName" class="form-control" maxlength="100" placeholder="Ej: Farmacia Ejemplo" /></label>
+            <label class="form-label">Contacto / Teléfono <input type="text" id="newClientContact" class="form-control" placeholder="+51 999 123 456" /></label>
+            <label class="form-label">Email <input type="email" id="newClientEmail" class="form-control" placeholder="cliente@ejemplo.com" /></label>
+            <label class="form-label">Dirección <input type="text" id="newClientAddress" class="form-control" placeholder="Av. Principal 123" /></label>
+            <label class="form-label">URL del Logo <input type="url" id="newClientImageUrl" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label>
+            <div id="newClientImagePreview" class="image-preview hidden"><img id="newClientPreviewImg" src="" alt="preview" style="max-height: 100px;" /></div>
+            <span id="addClientMessage" class="form-message"></span>
           </div>
-          <div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div>
+          <div class="modal-footer"><button id="cancelAddClientBtn" class="btn secondary">Cancelar</button><button id="confirmAddClientBtn" class="btn primary">Crear Cliente</button></div>
         </div>
       </div>
 
-      <div id="saleDetailModal" class="modal hidden">
+      <!-- MODAL AGREGAR PRODUCTO -->
+      <div id="addProductModal" class="modal hidden">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 500px;">
-          <div class="modal-header"><h3>Detalles de Venta</h3><button class="modal-close" id="closeSaleDetailModal">&times;</button></div>
-          <div class="modal-body"><div class="form-label"><strong>Cliente:</strong> <span id="saleDetailCliente">—</span></div><div class="form-label"><strong>Producto:</strong> <span id="saleDetailProducto">—</span></div><div class="form-label"><strong>Cantidad:</strong> <span id="saleDetailCantidad">—</span></div><div class="form-label"><strong>Precio Unitario:</strong> <span id="saleDetailPrecio">—</span></div><div class="form-label"><strong>Total:</strong> <span id="saleDetailTotal">—</span></div><div class="form-label"><strong>Fecha de Venta:</strong> <span id="saleDetailFecha">—</span></div><div class="form-label"><strong>Lote:</strong> <span id="saleDetailLote">—</span></div><div class="form-label"><strong>Fecha Vencimiento:</strong> <span id="saleDetailVencimiento">—</span></div></div>
-          <div class="modal-footer"><button id="closeSaleDetailBtn" class="btn secondary">Cerrar</button></div>
-        </div>
-      </div>
-
-      <div id="editSaleModal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 500px;">
-          <div class="modal-header"><h3>Editar Venta</h3><button class="modal-close" id="closeEditSaleModal">&times;</button></div>
+        <div class="modal-content" style="max-width: 600px;">
+          <div class="modal-header"><h3>➕ Nuevo Producto</h3><button class="modal-close" id="closeAddProductModal">&times;</button></div>
           <div class="modal-body">
-            <input type="hidden" id="editSaleId" />
-            <label class="form-label">Cliente <select id="editClienteId" class="form-control"></select></label>
-            <label class="form-label">Producto <select id="editProductoId" class="form-control"></select></label>
-            <label class="form-label">Imagen del producto <div id="editProductImagePreview" class="image-preview" style="width: 80px; height: 80px; margin-top: 5px;"><img id="editProductImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label>
-            <label class="form-label">Cantidad <input type="number" step="1" min="1" id="editCantidad" class="form-control" /></label>
-            <label class="form-label">Lote <input type="text" maxlength="50" id="editLote" class="form-control" /></label>
-            <label class="form-label">Fecha Vencimiento <input type="date" id="editFechaVencimiento" class="form-control" /></label>
-            <label class="form-label">Precio Unitario (S/) <input type="number" step="0.01" min="0.01" id="editPrecioVenta" class="form-control" /></label>
-            <span id="editSaleMessage" class="form-message"></span>
+            <label class="form-label">Nombre del Producto <input type="text" id="newProductName" class="form-control" maxlength="100" placeholder="Ej: Producto X" /></label>
+            <label class="form-label">Presentación <input type="text" id="newProductPresentation" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label>
+            <label class="form-label">Detalle / Descripción <textarea id="newProductDescription" class="form-control" rows="3"></textarea></label>
+            <label class="form-label">VVF (S/) <input type="number" step="0.01" id="newProductVVF" class="form-control" placeholder="0.00" /></label>
+            <label class="form-label">Dcto. Base (%) <input type="number" step="any" id="newProductDctoBase" class="form-control" placeholder="0" /></label>
+            <label class="form-label">PVF (S/) <input type="number" step="0.01" id="newProductPVF" class="form-control" placeholder="0.00" /></label>
+            <label class="form-label">URL de la Imagen <input type="url" id="newProductImageUrl" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label>
+            <div id="newProductImagePreview" class="image-preview hidden"><img id="newProductPreviewImg" src="" alt="preview" /></div>
+            <span id="addProductMessage" class="form-message"></span>
           </div>
-          <div class="modal-footer"><button id="cancelEditSaleBtn" class="btn secondary">Cancelar</button><button id="saveEditSaleBtn" class="btn primary">Guardar Cambios</button></div>
+          <div class="modal-footer"><button id="cancelAddProductBtn" class="btn secondary">Cancelar</button><button id="confirmAddProductBtn" class="btn primary">Crear Producto</button></div>
         </div>
       </div>
+
+      <!-- MODALES EXISTENTES (edición, imagen, etc.) -->
+      <div id="uploadModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content"><div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div><div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div></div></div>
+      <div id="productDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Producto</h3><button class="modal-close" id="closeDetailModal">&times;</button></div><div class="modal-body"><div id="productImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="productDetailImg" src="" alt="producto" /></div><label class="form-label">URL de la Imagen <input id="productDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="detailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="detailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Producto <input id="productDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">Presentación <input id="productDetailPresentation" type="text" maxlength="100" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label><label class="form-label">Detalle / Descripción <textarea id="productDetailDescription" class="form-control" rows="4" style="resize: vertical; font-family: inherit;"></textarea></label><div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;"><label class="form-label">VVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailVVF" /></label><label class="form-label">Dcto. Base (%) <input type="number" step="any" class="form-control" id="productDetailDctoBase" /></label><label class="form-label">PVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailPVF" /></label></div><span id="detailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelDetailBtn" class="btn secondary">Cancelar</button><button id="saveDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
+      <div id="clientDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div><div class="modal-body"><div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div><label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label><label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label><label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label><span id="clientDetailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
+      <div id="saleDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Detalles de Venta</h3><button class="modal-close" id="closeSaleDetailModal">&times;</button></div><div class="modal-body"><div class="form-label"><strong>Cliente:</strong> <span id="saleDetailCliente">—</span></div><div class="form-label"><strong>Producto:</strong> <span id="saleDetailProducto">—</span></div><div class="form-label"><strong>Cantidad:</strong> <span id="saleDetailCantidad">—</span></div><div class="form-label"><strong>Precio Unitario:</strong> <span id="saleDetailPrecio">—</span></div><div class="form-label"><strong>Total:</strong> <span id="saleDetailTotal">—</span></div><div class="form-label"><strong>Fecha de Venta:</strong> <span id="saleDetailFecha">—</span></div><div class="form-label"><strong>Lote:</strong> <span id="saleDetailLote">—</span></div><div class="form-label"><strong>Fecha Vencimiento:</strong> <span id="saleDetailVencimiento">—</span></div></div><div class="modal-footer"><button id="closeSaleDetailBtn" class="btn secondary">Cerrar</button></div></div></div>
+      <div id="editSaleModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Editar Venta</h3><button class="modal-close" id="closeEditSaleModal">&times;</button></div><div class="modal-body"><input type="hidden" id="editSaleId" /><label class="form-label">Cliente <select id="editClienteId" class="form-control"></select></label><label class="form-label">Producto <select id="editProductoId" class="form-control"></select></label><label class="form-label">Imagen del producto <div id="editProductImagePreview" class="image-preview" style="width: 80px; height: 80px; margin-top: 5px;"><img id="editProductImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label><label class="form-label">Cantidad <input type="number" step="1" min="1" id="editCantidad" class="form-control" /></label><label class="form-label">Lote <input type="text" maxlength="50" id="editLote" class="form-control" /></label><label class="form-label">Fecha Vencimiento <input type="date" id="editFechaVencimiento" class="form-control" /></label><label class="form-label">Precio Unitario (S/) <input type="number" step="0.01" min="0.01" id="editPrecioVenta" class="form-control" /></label><span id="editSaleMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelEditSaleBtn" class="btn secondary">Cancelar</button><button id="saveEditSaleBtn" class="btn primary">Guardar Cambios</button></div></div></div>
 
       <!-- IMPORTAR EXCEL -->
       <section id="import" class="view hidden">
@@ -193,5 +234,12 @@
       </section>
     </main>
   </div>
+  <!-- FOOTER ANIMADO -->
+  <footer class="animated-footer">
+    <div class="footer-content">
+      <span class="footer-text">Todos los derechos reservados</span>
+      <span class="footer-author">© Ismael Zamora</span>
+    </div>
+  </footer>
 </body>
 </html>

@@ -10,13 +10,11 @@ const firebaseConfig = {
   measurementId: "G-582KTMJQ4P"
 };
 
-// Inicialización compatible
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const storage = firebase.storage();
 const auth = firebase.auth();
 
-// 🔥 HABILITAR PERSISTENCIA OFFLINE (reduce lecturas)
 db.enablePersistence()
   .catch(err => {
     if (err.code === 'failed-precondition') {
@@ -26,17 +24,13 @@ db.enablePersistence()
     }
   });
 
-// Conectamos con app.js
 window.db = db;
 window.storage = storage;
 window.auth = auth;
 
-// Autenticación anónima (necesaria para uploads a Storage)
 auth.signInAnonymously().catch(err => {
   console.warn('Auth anónima falló (continuando de todas formas):', err.message);
 });
 
-// Avisamos que el sistema está listo
 window.dispatchEvent(new CustomEvent('firebase-ready'));
-
 console.log('%cCONECTADO A FIREBASE REAL CON PERSISTENCIA', 'color: blue; font-weight: bold;');

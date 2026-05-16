@@ -1,6 +1,7 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA con gráfico de ventas y top clientes
+// VERSIÓN COMPLETA con precios editables en venta, actualización de precios base,
+// cálculo automático de PVF, CRUD completo, footer animado
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -48,6 +49,43 @@ onFirebaseReady(() => {
     return clientLogos[clientName.toLowerCase()] || fallbackImg;
   }
 
+  // ─── NOTIFICACIONES TOAST ──────────────────────────────
+  function showToast(message, type = 'info') {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toastContainer';
+      container.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      `;
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `
+      <div class="toast-icon">${type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️'}</div>
+      <div class="toast-message">${message}</div>
+      <button class="toast-close">×</button>
+    `;
+    container.appendChild(toast);
+    toast.style.animation = 'slideInRight 0.3s ease forwards';
+    const timeout = setTimeout(() => {
+      toast.style.animation = 'fadeOut 0.3s ease forwards';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+      clearTimeout(timeout);
+      toast.style.animation = 'fadeOut 0.2s ease forwards';
+      setTimeout(() => toast.remove(), 200);
+    });
+  }
+
   // ─── NAVEGACIÓN ──────────────────────────────────────────
   const navBtns = document.querySelectorAll('.nav-btn');
   const views = document.querySelectorAll('.view');
@@ -68,7 +106,7 @@ onFirebaseReady(() => {
     if (v === 'clients')   loadClients();
   }));
 
-  // ─── CACHÉ GLOBAL (sin precios) ─────────────────────────
+  // ─── CACHÉ GLOBAL ────────────────────────────────────────
   async function refreshCache() {
     const [cs, ps, vs] = await Promise.all([
       db.collection('clientes').get(),
@@ -140,24 +178,24 @@ onFirebaseReady(() => {
     loadDashboard();
   })();
 
-  // ─── PERFIL (guardado en Firestore como base64) ───────────
+  // ─── PERFIL ───────────────────────────────────────────────
   document.getElementById('profileUpload').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('Por favor, selecciona una imagen válida'); return; }
-    if (file.size > 2 * 1024 * 1024) { alert('La imagen debe ser menor a 2MB'); return; }
+    if (!file.type.startsWith('image/')) { showToast('Por favor, selecciona una imagen válida', 'warning'); return; }
+    if (file.size > 2 * 1024 * 1024) { showToast('La imagen debe ser menor a 2MB', 'warning'); return; }
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64Data = event.target.result;
         await db.collection('settings').doc('profile').set({ photo: base64Data, updated: Date.now() }, { merge: true });
         loadProfile();
-        alert('✓ Foto guardada correctamente');
+        showToast('✓ Foto guardada correctamente', 'success');
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error('Error al guardar foto:', err);
-      alert('Error al guardar la foto: ' + err.message);
+      showToast('Error al guardar la foto: ' + err.message, 'error');
     }
   });
 
@@ -257,7 +295,7 @@ onFirebaseReady(() => {
     renderFeaturedProducts();
     renderRecentSales();
     renderSalesChart();
-    renderTopClientsChart();   // <-- NUEVO: gráfico de top clientes
+    renderTopClientsChart();
   }
 
   function renderProximasRecompras() {
@@ -309,14 +347,11 @@ onFirebaseReady(() => {
     }).join('');
   }
 
-  // ─── GRÁFICO DE VENTAS POR MES ──────────────────────────
   let salesChartInstance = null;
-
   function renderSalesChart() {
     const ctx = document.getElementById('salesChart');
     if (!ctx) return;
     const context = ctx.getContext('2d');
-
     const salesByMonth = {};
     ventasCache.forEach(v => {
       if (!v.fechaVenta) return;
@@ -333,45 +368,19 @@ onFirebaseReady(() => {
       return new Date(year, month-1).toLocaleDateString('es-PE', { month:'short', year:'numeric' });
     });
     const data = sortedMonths.map(m => salesByMonth[m]);
-
     if (salesChartInstance) salesChartInstance.destroy();
     salesChartInstance = new Chart(context, {
       type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Ventas (S/)',
-          data: data,
-          backgroundColor: 'rgba(37, 99, 235, 0.6)',
-          borderColor: 'rgba(37, 99, 235, 1)',
-          borderWidth: 1,
-          borderRadius: 8,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { position: 'top' },
-          tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } }
-        },
-        scales: {
-          y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } },
-          x: { title: { display: true, text: 'Mes' } }
-        }
-      }
+      data: { labels, datasets: [{ label: 'Ventas (S/)', data, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1, borderRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } }
     });
   }
 
-  // ─── GRÁFICO TOP 5 CLIENTES (barras horizontales) ──────
   let topClientsChartInstance = null;
-
   function renderTopClientsChart() {
     const canvas = document.getElementById('topClientsChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-
-    // Calcular total por cliente
     const clientTotals = {};
     ventasCache.forEach(v => {
       const precio = priceCache[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
@@ -379,81 +388,167 @@ onFirebaseReady(() => {
       const nombre = clientName(v.clienteId);
       clientTotals[nombre] = (clientTotals[nombre] || 0) + monto;
     });
-
-    // Convertir a array, ordenar y tomar top 5
-    const sorted = Object.entries(clientTotals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
+    const sorted = Object.entries(clientTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const labels = sorted.map(item => item[0]);
     const data = sorted.map(item => item[1]);
-
-    // Destruir gráfico anterior si existe
-    if (topClientsChartInstance) {
-      topClientsChartInstance.destroy();
-    }
-
+    if (topClientsChartInstance) topClientsChartInstance.destroy();
     topClientsChartInstance = new Chart(ctx, {
       type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Ventas totales (S/)',
-          data: data,
-          backgroundColor: 'rgba(34, 197, 94, 0.7)',
-          borderColor: 'rgba(34, 197, 94, 1)',
-          borderWidth: 1,
-          borderRadius: 6,
-        }]
-      },
-      options: {
-        indexAxis: 'y',  // barras horizontales
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { position: 'top' },
-          tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } }
-        },
-        scales: {
-          x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true },
-          y: { title: { display: true, text: 'Cliente' } }
-        }
-      }
+      data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
     });
   }
 
-  // ─── FORMULARIO DE VENTA (cargar datos y precio automático) ──
+  // ─── REGISTRO MÚLTIPLE DE VENTAS con precio editable ────
   async function loadFormData() {
     if (!clientsCache.length || !productsCache.length) await refreshCache();
     const clientSelect = document.getElementById('clientSelect');
-    const productSelect = document.getElementById('productSelect');
-    const priceField = document.getElementById('priceField');
-    const autoPriceBtn = document.getElementById('autoPriceBtn');
-    const productSaleImg = document.getElementById('productSaleImg');
-
     clientSelect.innerHTML = clientsCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
-    productSelect.innerHTML = productsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-
-    const updateProductImage = () => {
-      const product = productsCache.find(p => p.id === productSelect.value);
-      productSaleImg.src = (product && product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg;
-    };
-
-    const updatePrice = async (showLoading = false) => {
-      if (showLoading) priceField.placeholder = 'Cargando...';
-      const precio = await getPrice(clientSelect.value, productSelect.value);
-      priceField.value = precio !== null ? precio.toFixed(2) : '0.00';
-      priceField.placeholder = '';
-    };
-
-    autoPriceBtn?.addEventListener('click', async (e) => { e.preventDefault(); await updatePrice(true); });
-    clientSelect.addEventListener('change', () => updatePrice(true));
-    productSelect.addEventListener('change', () => { updatePrice(true); updateProductImage(); });
-    await updatePrice();
-    updateProductImage();
+    const newSelect = clientSelect.cloneNode(true);
+    clientSelect.parentNode.replaceChild(newSelect, clientSelect);
+    newSelect.addEventListener('change', async (e) => {
+      const clienteId = e.target.value;
+      if (clienteId) await loadProductTableForClient(clienteId);
+    });
+    if (newSelect.value) await loadProductTableForClient(newSelect.value);
+    else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td></tr>';
+    window.clientSelect = newSelect;
   }
 
-  // ─── HISTORIAL Y ACCIONES (con editar/eliminar) ──────────
+  async function loadProductTableForClient(clienteId) {
+    const tbody = document.getElementById('batchTableBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
+    const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clienteId).get();
+    const preciosMap = new Map();
+    preciosSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      preciosMap.set(data.productoId, { precio: data.precio, docId: doc.id });
+    });
+    const productosConPrecio = productsCache.filter(p => preciosMap.has(p.id));
+    if (productosConPrecio.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Este cliente no tiene precios asignados aún.</td></tr>';
+      return;
+    }
+    let html = '';
+    for (const prod of productosConPrecio) {
+      const precioObj = preciosMap.get(prod.id);
+      const precio = precioObj.precio;
+      const priceDocId = precioObj.docId;
+      const imgSrc = (prod.imagen && !prod.imagen.includes('via.placeholder')) ? prod.imagen : fallbackImg;
+      html += `<tr data-producto-id="${prod.id}" data-price-doc-id="${priceDocId}">
+          <td style="width: 60px;"><img src="${imgSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px;" onerror="this.src='${fallbackImg}'"></td>
+          <td>${prod.nombre}</td>
+          <td>${prod.presentacion || ''}</td>
+          <td class="price-cell">
+            <input type="number" step="0.01" class="form-control price-input" value="${precio.toFixed(2)}" style="width:100px; display:inline-block;">
+            <button type="button" class="btn-icon update-price-btn" data-product-id="${prod.id}" data-price-doc-id="${priceDocId}" style="margin-left:5px;" title="Actualizar precio base para este cliente">💾</button>
+          </td>
+          <td><input type="number" class="form-control batch-cantidad" style="width:80px;" min="0" step="1" value="0"></td>
+          <td><input type="text" class="form-control batch-lote" style="width:120px;" placeholder="Lote"></td>
+          <td><input type="date" class="form-control batch-vencimiento" style="width:130px;"></td>
+          <td style="text-align:center;"><button type="button" class="btn-toggle" data-producto-id="${prod.id}">🔘 Inactivo</button></td>
+        </tr>`;
+    }
+    tbody.innerHTML = html;
+
+    // Eventos para botones toggle
+    document.querySelectorAll('.btn-toggle').forEach(btn => {
+      btn.addEventListener('click', function() {
+        if (this.classList.contains('active')) {
+          this.classList.remove('active');
+          this.textContent = '🔘 Inactivo';
+        } else {
+          this.classList.add('active');
+          this.textContent = '✅ Activo';
+        }
+      });
+    });
+
+    // Eventos para cantidad que activan/desactivan toggle
+    document.querySelectorAll('.batch-cantidad').forEach(input => {
+      input.addEventListener('change', function() {
+        const row = this.closest('tr');
+        const toggleBtn = row.querySelector('.btn-toggle');
+        if (parseInt(this.value) > 0 && !toggleBtn.classList.contains('active')) {
+          toggleBtn.classList.add('active');
+          toggleBtn.textContent = '✅ Activo';
+        } else if (parseInt(this.value) === 0 && toggleBtn.classList.contains('active')) {
+          toggleBtn.classList.remove('active');
+          toggleBtn.textContent = '🔘 Inactivo';
+        }
+      });
+    });
+
+    // Eventos para actualizar precio base
+    document.querySelectorAll('.update-price-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const productId = btn.dataset.productId;
+        const priceDocId = btn.dataset.priceDocId;
+        const row = btn.closest('tr');
+        const priceInput = row.querySelector('.price-input');
+        const newPrice = parseFloat(priceInput.value);
+        if (isNaN(newPrice) || newPrice <= 0) {
+          showToast('Ingrese un precio válido', 'error');
+          return;
+        }
+        try {
+          await db.collection('precios').doc(priceDocId).update({ precio: newPrice });
+          // Actualizar cache local
+          const key = `${clienteId}_${productId}`;
+          priceCache[key] = newPrice;
+          showToast(`Precio base actualizado a S/ ${newPrice.toFixed(2)}`, 'success');
+        } catch (err) {
+          showToast('Error al actualizar precio: ' + err.message, 'error');
+        }
+      });
+    });
+  }
+
+  async function registerBatchSales() {
+    const clienteId = window.clientSelect ? window.clientSelect.value : document.getElementById('clientSelect').value;
+    if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
+    const rows = document.querySelectorAll('#batchTableBody tr');
+    const ventasParaGuardar = [];
+    for (const row of rows) {
+      const productoId = row.dataset.productoId;
+      const toggleBtn = row.querySelector('.btn-toggle');
+      if (!toggleBtn || !toggleBtn.classList.contains('active')) continue;
+      const cantidadInput = row.querySelector('.batch-cantidad');
+      const cantidad = parseInt(cantidadInput.value);
+      if (isNaN(cantidad) || cantidad <= 0) { showToast(`La cantidad para ${productoId} debe ser un número positivo`, 'error'); return; }
+      const lote = row.querySelector('.batch-lote').value.trim();
+      if (!lote) { showToast(`El lote es obligatorio para ${productoId}`, 'error'); return; }
+      const vencimiento = row.querySelector('.batch-vencimiento').value;
+      if (!vencimiento) { showToast(`La fecha de vencimiento es obligatoria para ${productoId}`, 'error'); return; }
+      const precioInput = row.querySelector('.price-input');
+      const precio = parseFloat(precioInput.value);
+      if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
+      const now = new Date();
+      const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
+      ventasParaGuardar.push({ clienteId, productoId, cantidad, lote, fechaVencimiento: new Date(vencimiento), fechaVenta: now, mesCompra, precioVenta: precio });
+    }
+    if (ventasParaGuardar.length === 0) { showToast('Activa al menos un producto con cantidad > 0', 'warning'); return; }
+    const batch = db.batch();
+    for (const venta of ventasParaGuardar) { batch.set(db.collection('ventas').doc(), venta); }
+    const btn = document.getElementById('registerBatchBtn');
+    btn.disabled = true;
+    try {
+      await batch.commit();
+      for (const venta of ventasParaGuardar) ventasCache.push({ id: Date.now() + Math.random(), ...venta });
+      showToast(`✓ ${ventasParaGuardar.length} ventas registradas correctamente`, 'success');
+      document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
+      document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
+      document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
+      document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
+      await refreshCache();
+      loadDashboard();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+    finally { btn.disabled = false; }
+  }
+  document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
+
+  // ─── HISTORIAL Y ACCIONES ──────────────────────────────
   async function loadHistory() {
     if (!ventasCache.length) await refreshCache();
     const tbody = document.querySelector('#historyTable tbody');
@@ -462,66 +557,26 @@ onFirebaseReady(() => {
     const filterCliente = document.getElementById('filterClient').value.toLowerCase();
     const filterProducto = document.getElementById('filterProduct').value.toLowerCase();
     const rows = sorted.filter(v => clientName(v.clienteId).toLowerCase().includes(filterCliente) && productName(v.productoId).toLowerCase().includes(filterProducto));
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin ventas registradas</td></tr>'; return; }
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin ventas registradas</td</tr>'; return; }
     const priceMap = await getMultiplePrices(rows);
     rows.forEach(v => {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
       const total = (precio * (v.cantidad||0)).toFixed(2);
       const dias = daysDiff(v.fechaVencimiento);
       let vencClass = '', vencText = fmtDate(v.fechaVencimiento);
-      if (dias !== null) {
-        if (dias < 0) { vencClass = 'text-danger'; vencText += ' ⚠️'; }
-        else if (dias <= 15) { vencClass = 'text-warn'; vencText += ` (${dias}d)`; }
-      }
+      if (dias !== null) { if (dias < 0) { vencClass = 'text-danger'; vencText += ' ⚠️'; } else if (dias <= 15) { vencClass = 'text-warn'; vencText += ` (${dias}d)`; } }
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${clientName(v.clienteId)}</td>
-        <td>${productName(v.productoId)}</td>
-        <td>${fmtDate(v.fechaVenta)}</td>
-        <td>${v.cantidad}</td>
-        <td>S/${precio.toFixed(2)}</td>
-        <td>S/${total}</td>
-        <td class="${vencClass}">${vencText}</td>
-        <td style="text-align:center;white-space:nowrap">
-          <button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button>
-          <button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button>
-          <button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button>
-        </td>
-      `;
+      tr.innerHTML = `<td>${clientName(v.clienteId)}</td><td>${productName(v.productoId)}</td><td>${fmtDate(v.fechaVenta)}</td><td>${v.cantidad}</td><td>S/${precio.toFixed(2)}</td><td>S/${total}</td><td class="${vencClass}">${vencText}</td>
+        <td style="text-align:center;white-space:nowrap"><button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button><button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button><button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button></td>`;
       tbody.appendChild(tr);
     });
-
-    document.querySelectorAll('.btn-view').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const saleId = btn.dataset.saleId;
-        const venta = ventasCache.find(v => v.id === saleId);
-        if (venta) viewSaleDetail(venta);
-      });
-    });
-    document.querySelectorAll('.btn-edit').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const saleId = btn.dataset.saleId;
-        const venta = ventasCache.find(v => v.id === saleId);
-        if (venta) editSale(venta);
-      });
-    });
-    document.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const saleId = btn.dataset.saleId;
-        if (confirm('¿Estás seguro de eliminar esta venta?')) {
-          await db.collection('ventas').doc(saleId).delete();
-          ventasCache = ventasCache.filter(v => v.id !== saleId);
-          loadHistory();
-          loadDashboard();
-        }
-      });
-    });
+    document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) viewSaleDetail(venta); }));
+    document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) editSale(venta); }));
+    document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', async () => { if (confirm('¿Estás seguro de eliminar esta venta?')) { try { await db.collection('ventas').doc(btn.dataset.saleId).delete(); ventasCache = ventasCache.filter(v => v.id !== btn.dataset.saleId); showToast('Venta eliminada correctamente', 'success'); loadHistory(); loadDashboard(); } catch (err) { showToast('Error al eliminar venta: ' + err.message, 'error'); } } }));
   }
-
   document.getElementById('filterClient').addEventListener('input', () => { if (!document.getElementById('history').classList.contains('hidden')) loadHistory(); });
   document.getElementById('filterProduct').addEventListener('input', () => { if (!document.getElementById('history').classList.contains('hidden')) loadHistory(); });
 
-  // ─── VER DETALLES DE VENTA ──────────────────────────────
   function viewSaleDetail(venta) {
     const modal = document.getElementById('saleDetailModal');
     const precio = venta.precioVenta || 0;
@@ -537,7 +592,6 @@ onFirebaseReady(() => {
     modal.classList.remove('hidden');
   }
 
-  // ─── EDITAR VENTA (modal) ────────────────────────────────
   function editSale(venta) {
     const modal = document.getElementById('editSaleModal');
     const clientSelect = document.getElementById('editClienteId');
@@ -548,14 +602,9 @@ onFirebaseReady(() => {
     document.getElementById('editCantidad').value = venta.cantidad || 1;
     document.getElementById('editLote').value = venta.lote || '';
     document.getElementById('editPrecioVenta').value = venta.precioVenta || 0;
-    if (venta.fechaVencimiento) {
-      const date = toDateObj(venta.fechaVencimiento);
-      if (date) document.getElementById('editFechaVencimiento').value = date.toISOString().split('T')[0];
-    } else document.getElementById('editFechaVencimiento').value = '';
-    const updateEditProductImage = () => {
-      const product = productsCache.find(p => p.id === productSelect.value);
-      document.getElementById('editProductImg').src = (product && product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg;
-    };
+    if (venta.fechaVencimiento) { const date = toDateObj(venta.fechaVencimiento); if (date) document.getElementById('editFechaVencimiento').value = date.toISOString().split('T')[0]; }
+    else document.getElementById('editFechaVencimiento').value = '';
+    const updateEditProductImage = () => { const product = productsCache.find(p => p.id === productSelect.value); document.getElementById('editProductImg').src = (product && product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg; };
     productSelect.removeEventListener('change', updateEditProductImage);
     productSelect.addEventListener('change', updateEditProductImage);
     updateEditProductImage();
@@ -563,7 +612,6 @@ onFirebaseReady(() => {
     modal.classList.remove('hidden');
   }
 
-  // Cerrar modales
   document.getElementById('closeSaleDetailModal')?.addEventListener('click', () => document.getElementById('saleDetailModal').classList.add('hidden'));
   document.getElementById('closeSaleDetailBtn')?.addEventListener('click', () => document.getElementById('saleDetailModal').classList.add('hidden'));
   document.querySelector('#saleDetailModal .modal-overlay')?.addEventListener('click', () => document.getElementById('saleDetailModal').classList.add('hidden'));
@@ -571,7 +619,6 @@ onFirebaseReady(() => {
   document.getElementById('cancelEditSaleBtn')?.addEventListener('click', () => document.getElementById('editSaleModal').classList.add('hidden'));
   document.querySelector('#editSaleModal .modal-overlay')?.addEventListener('click', () => document.getElementById('editSaleModal').classList.add('hidden'));
 
-  // Guardar edición de venta
   document.getElementById('saveEditSaleBtn')?.addEventListener('click', async () => {
     const saleId = document.getElementById('editSaleId').value;
     const clienteId = document.getElementById('editClienteId').value;
@@ -581,10 +628,10 @@ onFirebaseReady(() => {
     const precioVenta = parseFloat(document.getElementById('editPrecioVenta').value);
     const fechaVencimiento = document.getElementById('editFechaVencimiento').value;
     const msg = document.getElementById('editSaleMessage');
-    if (isNaN(cantidad) || cantidad <= 0) { msg.textContent = 'Cantidad positiva requerida'; msg.style.color = 'var(--danger)'; return; }
-    if (!lote) { msg.textContent = 'Lote requerido'; msg.style.color = 'var(--danger)'; return; }
-    if (!fechaVencimiento) { msg.textContent = 'Fecha de vencimiento requerida'; msg.style.color = 'var(--danger)'; return; }
-    if (isNaN(precioVenta) || precioVenta <= 0) { msg.textContent = 'Precio unitario positivo requerido'; msg.style.color = 'var(--danger)'; return; }
+    if (isNaN(cantidad) || cantidad <= 0) { showToast('Cantidad positiva requerida', 'error'); msg.textContent = 'Cantidad positiva requerida'; msg.style.color = 'var(--danger)'; return; }
+    if (!lote) { showToast('Lote requerido', 'error'); msg.textContent = 'Lote requerido'; msg.style.color = 'var(--danger)'; return; }
+    if (!fechaVencimiento) { showToast('Fecha de vencimiento requerida', 'error'); msg.textContent = 'Fecha de vencimiento requerida'; msg.style.color = 'var(--danger)'; return; }
+    if (isNaN(precioVenta) || precioVenta <= 0) { showToast('Precio unitario positivo requerido', 'error'); msg.textContent = 'Precio unitario positivo requerido'; msg.style.color = 'var(--danger)'; return; }
     msg.textContent = 'Guardando...'; msg.style.color = 'var(--muted)';
     try {
       const updateData = { clienteId, productoId, cantidad, lote, precioVenta, fechaVencimiento: new Date(fechaVencimiento) };
@@ -592,62 +639,12 @@ onFirebaseReady(() => {
       const index = ventasCache.findIndex(v => v.id === saleId);
       if (index !== -1) ventasCache[index] = { ...ventasCache[index], ...updateData };
       msg.textContent = '✓ Venta actualizada'; msg.style.color = 'var(--success)';
+      showToast('Venta actualizada correctamente', 'success');
       setTimeout(() => { document.getElementById('editSaleModal').classList.add('hidden'); loadHistory(); loadDashboard(); }, 1500);
-    } catch (err) { msg.textContent = 'Error: ' + err.message; msg.style.color = 'var(--danger)'; }
+    } catch (err) { msg.textContent = 'Error: ' + err.message; msg.style.color = 'var(--danger)'; showToast('Error al actualizar venta: ' + err.message, 'error'); }
   });
 
-  // ─── FORMULARIO DE VENTA (SUBMIT) ──────────────────────────
-  const saleForm = document.getElementById('saleForm');
-  const saleMessage = document.getElementById('saleMessage');
-  saleForm?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const clienteId = document.getElementById('clientSelect').value;
-    const productoId = document.getElementById('productSelect').value;
-    const cantidadStr = document.getElementById('cantidadField').value;
-    const precioStr = document.getElementById('priceField').value;
-    const lote = document.getElementById('loteField').value.trim();
-    const vencimiento = document.getElementById('vencimientoField').value;
-
-    if (!clienteId) { saleMessage.textContent = 'Selecciona un cliente'; saleMessage.style.color = 'var(--danger)'; return; }
-    if (!productoId) { saleMessage.textContent = 'Selecciona un producto'; saleMessage.style.color = 'var(--danger)'; return; }
-    if (!cantidadStr) { saleMessage.textContent = 'Ingresa una cantidad'; saleMessage.style.color = 'var(--danger)'; return; }
-    const cantidad = parseInt(cantidadStr, 10);
-    if (isNaN(cantidad) || cantidad <= 0) { saleMessage.textContent = 'La cantidad debe ser un número entero positivo'; saleMessage.style.color = 'var(--danger)'; return; }
-    if (!precioStr || precioStr.trim() === '') { saleMessage.textContent = 'Ingresa el precio (automático o manual)'; saleMessage.style.color = 'var(--danger)'; return; }
-    let precio = parseFloat(precioStr);
-    if (isNaN(precio) || precio <= 0) { saleMessage.textContent = 'Precio inválido (debe ser positivo)'; saleMessage.style.color = 'var(--danger)'; return; }
-    if (!lote) { saleMessage.textContent = 'Ingresa un número de lote'; saleMessage.style.color = 'var(--danger)'; return; }
-    if (!vencimiento) { saleMessage.textContent = 'Ingresa la fecha de vencimiento'; saleMessage.style.color = 'var(--danger)'; return; }
-
-    const vencDate = new Date(vencimiento);
-    vencDate.setHours(0,0,0,0);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    if (vencDate < today) {
-      const proceed = confirm('⚠️ Esta fecha de vencimiento ya pasó. ¿Deseas continuar de todas formas?');
-      if (!proceed) return;
-    }
-
-    const now = new Date();
-    const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
-    const ventaData = {
-      clienteId, productoId, cantidad, fechaVenta: new Date(), mesCompra,
-      precioVenta: precio, lote, fechaVencimiento: new Date(vencimiento)
-    };
-    saleMessage.textContent = 'Guardando...'; saleMessage.style.color = 'var(--muted)';
-    try {
-      const ref = await db.collection('ventas').add(ventaData);
-      ventasCache.push({ id: ref.id, ...ventaData });
-      saleMessage.textContent = '✓ Venta guardada'; saleMessage.style.color = 'var(--success)';
-      saleForm.reset();
-      document.getElementById('productSaleImg').src = fallbackImg;
-      await refreshCache();
-      loadDashboard();
-      setTimeout(() => saleMessage.textContent = '', 3000);
-    } catch (err) { saleMessage.textContent = 'Error: ' + err.message; saleMessage.style.color = 'var(--danger)'; }
-  });
-
-  // ─── CLIENTES (lista con tarjetas) ─────────────────────────
+  // ─── CLIENTES con eliminación ─────────────────────────
   async function loadClients() {
     if (!clientsCache.length) await refreshCache();
     const grid = document.getElementById('clientsGrid');
@@ -655,21 +652,14 @@ onFirebaseReady(() => {
     const hoy = Date.now();
     const hace30 = hoy - 30*86400000, hace60 = hoy - 60*86400000;
     const priceMap = await getMultiplePrices(ventasCache);
-    clientsCache.forEach(c => {
+    for (const c of clientsCache) {
       const buys = ventasCache.filter(v => v.clienteId === c.id && v.fechaVenta);
       const sorted = buys.sort((a,b)=> (b.fechaVenta?.seconds||0)-(a.fechaVenta?.seconds||0));
       const lastTs = sorted[0] ? toDateObj(sorted[0].fechaVenta)?.getTime() : null;
       const totalCompras = buys.length;
-      const totalMonto = buys.reduce((sum,v) => {
-        const p = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-        return sum + p * (v.cantidad||0);
-      }, 0);
+      const totalMonto = buys.reduce((sum,v) => { const p = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0; return sum + p * (v.cantidad||0); }, 0);
       let estadoLabel = 'Sin compras', estadoClass = 'inactive';
-      if (lastTs) {
-        if (lastTs >= hace30) { estadoLabel = 'Activo'; estadoClass = 'active'; }
-        else if (lastTs >= hace60) { estadoLabel = 'Inactivo'; estadoClass = 'warn'; }
-        else { estadoLabel = 'Sin comprar +60d'; estadoClass = 'inactive'; }
-      }
+      if (lastTs) { if (lastTs >= hace30) { estadoLabel = 'Activo'; estadoClass = 'active'; } else if (lastTs >= hace60) { estadoLabel = 'Inactivo'; estadoClass = 'warn'; } else { estadoLabel = 'Sin comprar +60d'; estadoClass = 'inactive'; } }
       const prodCount = {};
       buys.forEach(v => { prodCount[v.productoId] = (prodCount[v.productoId]||0)+(v.cantidad||0); });
       const topProd = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,2);
@@ -677,6 +667,7 @@ onFirebaseReady(() => {
       const card = document.createElement('div');
       card.className = 'client-card';
       card.innerHTML = `
+        <button class="card-delete-btn" data-client-id="${c.id}" title="Eliminar cliente">🗑️</button>
         <div class="client-header">
           <img src="${c.imagen || getClientLogo(c.nombre)}" alt="${c.nombre}" class="client-logo" onerror="this.src='${fallbackImg}'" />
           <div><div class="client-nombre">${c.nombre}</div><span class="status ${estadoClass}">${estadoLabel}</span></div>
@@ -691,53 +682,222 @@ onFirebaseReady(() => {
       card.addEventListener('dblclick', () => openClientDetail(c));
       card.style.cursor = 'pointer';
       grid.appendChild(card);
+    }
+    document.querySelectorAll('.card-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => { e.stopPropagation(); await deleteClient(btn.dataset.clientId); });
     });
   }
 
-  // ─── PRODUCTOS (lista con tarjetas) ────────────────────────
+  async function deleteClient(clientId) {
+    if (!confirm('¿Eliminar este cliente? Se borrarán TODOS sus precios y ventas asociadas.')) return;
+    try {
+      const client = clientsCache.find(c => c.id === clientId);
+      if (!client) throw new Error('Cliente no encontrado');
+      const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clientId).get();
+      const ventasSnapshot = await db.collection('ventas').where('clienteId', '==', clientId).get();
+      const batch = db.batch();
+      preciosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      ventasSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      batch.delete(db.collection('clientes').doc(clientId));
+      await batch.commit();
+      await refreshCache();
+      priceCache = {};
+      loadClients();
+      loadDashboard();
+      loadHistory();
+      showToast(`Cliente "${client.nombre}" eliminado correctamente`, 'success');
+    } catch (err) { showToast('Error al eliminar cliente: ' + err.message, 'error'); }
+  }
+
+  // ─── PRODUCTOS con eliminación y cálculo automático de PVF ──
   async function loadProducts() {
     if (!productsCache.length) await refreshCache();
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = '';
     const ventasByProd = {};
     ventasCache.forEach(v => { ventasByProd[v.productoId] = (ventasByProd[v.productoId]||0)+(v.cantidad||0); });
-    productsCache.forEach(p => {
+    for (const p of productsCache) {
       const imgSrc = (p.imagen && !p.imagen.includes('via.placeholder')) ? p.imagen : fallbackImg;
       const card = document.createElement('div');
       card.className = 'product-card';
       card.style.cursor = 'pointer';
       card.innerHTML = `
+        <button class="card-delete-btn" data-product-id="${p.id}" title="Eliminar producto">🗑️</button>
         <div class="product-image"><img src="${imgSrc}" onerror="this.src='${fallbackImg}'"></div>
         <div class="product-name">${p.nombre}</div>
         <div class="product-presentation">${p.presentacion || ''}</div>
         <div class="product-prices">
           <div class="price-item"><div class="price-label">VVF</div><div class="price-value">S/${(p.vvf||0).toFixed(2)}</div></div>
+          <div class="price-item"><div class="price-label">Dcto. Base</div><div class="price-value">${(p.dctoBase||0)*100}%</div></div>
           <div class="price-item"><div class="price-label">PVF</div><div class="price-value">S/${(p.pvf||0).toFixed(2)}</div></div>
           <div class="price-item"><div class="price-label">Vendidos</div><div class="price-value">${ventasByProd[p.id]||0}</div></div>
         </div>
       `;
       card.addEventListener('dblclick', () => openProductDetail(p));
       grid.appendChild(card);
+    }
+    document.querySelectorAll('.card-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => { e.stopPropagation(); await deleteProduct(btn.dataset.productId); });
     });
   }
 
-  // ─── DETALLES PRODUCTO ──────────────────────────────────
+  async function deleteProduct(productId) {
+    if (!confirm('¿Eliminar este producto? Se borrarán TODOS sus precios y ventas asociadas.')) return;
+    try {
+      const product = productsCache.find(p => p.id === productId);
+      if (!product) throw new Error('Producto no encontrado');
+      const preciosSnapshot = await db.collection('precios').where('productoId', '==', productId).get();
+      const ventasSnapshot = await db.collection('ventas').where('productoId', '==', productId).get();
+      const batch = db.batch();
+      preciosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      ventasSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      batch.delete(db.collection('productos').doc(productId));
+      await batch.commit();
+      await refreshCache();
+      priceCache = {};
+      loadProducts();
+      loadDashboard();
+      loadHistory();
+      showToast(`Producto "${product.nombre}" eliminado correctamente`, 'success');
+    } catch (err) { showToast('Error al eliminar producto: ' + err.message, 'error'); }
+  }
+
+  // ─── AGREGAR CLIENTE ─────────────────────────────────
+  function openAddClientModal() {
+    document.getElementById('newClientName').value = '';
+    document.getElementById('newClientContact').value = '';
+    document.getElementById('newClientEmail').value = '';
+    document.getElementById('newClientAddress').value = '';
+    document.getElementById('newClientImageUrl').value = '';
+    document.getElementById('newClientImagePreview').classList.add('hidden');
+    document.getElementById('addClientMessage').textContent = '';
+    document.getElementById('addClientModal').classList.remove('hidden');
+  }
+  async function addNewClient() {
+    const nombre = document.getElementById('newClientName').value.trim();
+    if (!nombre) { showToast('El nombre es obligatorio', 'error'); document.getElementById('addClientMessage').textContent = 'El nombre es obligatorio'; return; }
+    const contacto = document.getElementById('newClientContact').value.trim();
+    const email = document.getElementById('newClientEmail').value.trim();
+    const direccion = document.getElementById('newClientAddress').value.trim();
+    const imagen = document.getElementById('newClientImageUrl').value.trim();
+    const msgSpan = document.getElementById('addClientMessage');
+    msgSpan.textContent = 'Creando cliente y precios base...';
+    msgSpan.style.color = 'var(--muted)';
+    const btn = document.getElementById('confirmAddClientBtn');
+    btn.disabled = true;
+    try {
+      const clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      await db.collection('clientes').doc(clientId).set({ nombre, contacto: contacto || '', email: email || '', direccion: direccion || '', imagen: imagen || '' });
+      const batch = db.batch();
+      for (const prod of productsCache) {
+        const precioBase = prod.pvf || 0;
+        const priceId = `${clientId}_${prod.id}`;
+        batch.set(db.collection('precios').doc(priceId), { clienteId: clientId, productoId: prod.id, precio: precioBase });
+      }
+      await batch.commit();
+      await refreshCache();
+      priceCache = {};
+      loadClients();
+      loadFormData();
+      showToast(`Cliente "${nombre}" creado con precios base (PVF)`, 'success');
+      document.getElementById('addClientModal').classList.add('hidden');
+    } catch (err) { showToast('Error al crear cliente: ' + err.message, 'error'); msgSpan.textContent = 'Error: ' + err.message; msgSpan.style.color = 'var(--danger)'; }
+    finally { btn.disabled = false; }
+  }
+
+  // ─── AGREGAR PRODUCTO con cálculo automático de PVF ───
+  function openAddProductModal() {
+    document.getElementById('newProductName').value = '';
+    document.getElementById('newProductPresentation').value = '';
+    document.getElementById('newProductDescription').value = '';
+    document.getElementById('newProductVVF').value = '';
+    document.getElementById('newProductDctoBase').value = '';
+    document.getElementById('newProductPVF').value = '';
+    document.getElementById('newProductImageUrl').value = '';
+    document.getElementById('newProductImagePreview').classList.add('hidden');
+    document.getElementById('addProductMessage').textContent = '';
+    document.getElementById('addProductModal').classList.remove('hidden');
+
+    // Listener para calcular PVF automáticamente
+    const vvfInput = document.getElementById('newProductVVF');
+    const dctoInput = document.getElementById('newProductDctoBase');
+    const pvfInput = document.getElementById('newProductPVF');
+    const updatePVF = () => {
+      const vvf = parseFloat(vvfInput.value) || 0;
+      const dcto = (parseFloat(dctoInput.value) || 0) / 100;
+      const pvf = vvf * (1 - dcto) * 1.18;
+      pvfInput.value = pvf.toFixed(2);
+    };
+    vvfInput.removeEventListener('input', updatePVF);
+    dctoInput.removeEventListener('input', updatePVF);
+    vvfInput.addEventListener('input', updatePVF);
+    dctoInput.addEventListener('input', updatePVF);
+  }
+  async function addNewProduct() {
+    const nombre = document.getElementById('newProductName').value.trim();
+    if (!nombre) { showToast('El nombre es obligatorio', 'error'); document.getElementById('addProductMessage').textContent = 'El nombre es obligatorio'; return; }
+    const presentacion = document.getElementById('newProductPresentation').value.trim();
+    const descripcion = document.getElementById('newProductDescription').value.trim();
+    const vvf = parseFloat(document.getElementById('newProductVVF').value) || 0;
+    const dctoBase = (parseFloat(document.getElementById('newProductDctoBase').value) || 0) / 100;
+    const pvf = parseFloat(document.getElementById('newProductPVF').value) || 0;
+    const imagen = document.getElementById('newProductImageUrl').value.trim();
+    const msgSpan = document.getElementById('addProductMessage');
+    msgSpan.textContent = 'Creando producto y precios para todos los clientes...';
+    msgSpan.style.color = 'var(--muted)';
+    const btn = document.getElementById('confirmAddProductBtn');
+    btn.disabled = true;
+    try {
+      const productId = 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      await db.collection('productos').doc(productId).set({ nombre, presentacion: presentacion || '', descripcion: descripcion || '', vvf, dctoBase, pvf, imagen: imagen || '' });
+      const batch = db.batch();
+      for (const client of clientsCache) {
+        const priceId = `${client.id}_${productId}`;
+        batch.set(db.collection('precios').doc(priceId), { clienteId: client.id, productoId: productId, precio: pvf });
+      }
+      await batch.commit();
+      await refreshCache();
+      priceCache = {};
+      loadProducts();
+      loadFormData();
+      showToast(`Producto "${nombre}" creado con precios base (PVF) para todos los clientes`, 'success');
+      document.getElementById('addProductModal').classList.add('hidden');
+    } catch (err) { showToast('Error al crear producto: ' + err.message, 'error'); msgSpan.textContent = 'Error: ' + err.message; msgSpan.style.color = 'var(--danger)'; }
+    finally { btn.disabled = false; }
+  }
+
+  // ─── DETALLES PRODUCTO con edición y cálculo de PVF ──
   function openProductDetail(product) {
     const modal = document.getElementById('productDetailModal');
     document.getElementById('productDetailName').value = product.nombre || '';
     document.getElementById('productDetailPresentation').value = product.presentacion || '';
     document.getElementById('productDetailDescription').value = product.descripcion || '';
     document.getElementById('productDetailImageUrl').value = product.imagen || '';
-    document.getElementById('productDetailVVF').value = `S/${(product.vvf||0).toFixed(2)}`;
-    document.getElementById('productDetailPVF').value = `S/${(product.pvf||0).toFixed(2)}`;
+    document.getElementById('productDetailVVF').value = (product.vvf || 0).toFixed(2);
+    document.getElementById('productDetailDctoBase').value = ((product.dctoBase || 0) * 100).toFixed(2);
+    document.getElementById('productDetailPVF').value = (product.pvf || 0).toFixed(2);
     document.getElementById('detailMessage').textContent = '';
     const imgSrc = (product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg;
     document.getElementById('productDetailImg').src = imgSrc;
     document.getElementById('detailImagePreview').classList.add('hidden');
     modal.dataset.productId = product.id;
     modal.classList.remove('hidden');
-  }
 
+    // Listeners para recalcular PVF en tiempo real
+    const vvfInput = document.getElementById('productDetailVVF');
+    const dctoInput = document.getElementById('productDetailDctoBase');
+    const pvfInput = document.getElementById('productDetailPVF');
+    const updatePVF = () => {
+      const vvf = parseFloat(vvfInput.value) || 0;
+      const dcto = (parseFloat(dctoInput.value) || 0) / 100;
+      const pvf = vvf * (1 - dcto) * 1.18;
+      pvfInput.value = pvf.toFixed(2);
+    };
+    vvfInput.removeEventListener('input', updatePVF);
+    dctoInput.removeEventListener('input', updatePVF);
+    vvfInput.addEventListener('input', updatePVF);
+    dctoInput.addEventListener('input', updatePVF);
+  }
   function closeProductDetail() { document.getElementById('productDetailModal').classList.add('hidden'); }
   document.getElementById('closeDetailModal')?.addEventListener('click', closeProductDetail);
   document.getElementById('cancelDetailBtn')?.addEventListener('click', closeProductDetail);
@@ -759,24 +919,29 @@ onFirebaseReady(() => {
     const presentacion = document.getElementById('productDetailPresentation').value.trim();
     const descripcion = document.getElementById('productDetailDescription').value.trim();
     const imagen = document.getElementById('productDetailImageUrl').value.trim();
+    const vvf = parseFloat(document.getElementById('productDetailVVF').value);
+    const dctoBase = (parseFloat(document.getElementById('productDetailDctoBase').value) || 0) / 100;
+    const pvf = parseFloat(document.getElementById('productDetailPVF').value);
     const message = document.getElementById('detailMessage');
-    if (!nombre) { message.textContent = 'El nombre es requerido'; message.style.color = 'var(--danger)'; return; }
+    if (!nombre) { showToast('El nombre es requerido', 'error'); message.textContent = 'El nombre es requerido'; message.style.color = 'var(--danger)'; return; }
+    if (isNaN(vvf) || isNaN(dctoBase) || isNaN(pvf)) { showToast('VVF, Dcto. Base y PVF deben ser números válidos', 'error'); message.textContent = 'VVF, Dcto. Base y PVF deben ser números válidos'; message.style.color = 'var(--danger)'; return; }
     message.textContent = 'Guardando...'; message.style.color = 'var(--muted)';
     document.getElementById('saveDetailBtn').disabled = true;
     try {
-      const updateData = { nombre, presentacion: presentacion || '', descripcion: descripcion || '' };
+      const updateData = { nombre, presentacion: presentacion || '', descripcion: descripcion || '', vvf, dctoBase, pvf };
       if (imagen) updateData.imagen = imagen;
       await db.collection('productos').doc(productId).update(updateData);
       const prod = productsCache.find(p => p.id === productId);
-      if (prod) { prod.nombre = nombre; prod.presentacion = presentacion || ''; prod.descripcion = descripcion || ''; if (imagen) prod.imagen = imagen; }
+      if (prod) { prod.nombre = nombre; prod.presentacion = presentacion || ''; prod.descripcion = descripcion || ''; prod.vvf = vvf; prod.dctoBase = dctoBase; prod.pvf = pvf; if (imagen) prod.imagen = imagen; }
       message.textContent = '✓ Guardado'; message.style.color = 'var(--success)';
+      showToast('Producto actualizado correctamente', 'success');
       setTimeout(() => { closeProductDetail(); loadProducts(); }, 1500);
-    } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; }
+    } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; showToast('Error al guardar producto: ' + err.message, 'error'); }
     document.getElementById('saveDetailBtn').disabled = false;
   });
   document.querySelector('#productDetailModal .modal-overlay')?.addEventListener('click', closeProductDetail);
 
-  // ─── DETALLES CLIENTE ───────────────────────────────────
+  // ─── DETALLES CLIENTE con toast (edición) ────────────
   function openClientDetail(client) {
     const modal = document.getElementById('clientDetailModal');
     document.getElementById('clientDetailName').value = client.nombre || '';
@@ -791,7 +956,6 @@ onFirebaseReady(() => {
     modal.dataset.clientId = client.id;
     modal.classList.remove('hidden');
   }
-
   function closeClientDetail() { document.getElementById('clientDetailModal').classList.add('hidden'); }
   document.getElementById('closeClientDetailModal')?.addEventListener('click', closeClientDetail);
   document.getElementById('cancelClientDetailBtn')?.addEventListener('click', closeClientDetail);
@@ -815,7 +979,7 @@ onFirebaseReady(() => {
     const direccion = document.getElementById('clientDetailAddress').value.trim();
     const imagen = document.getElementById('clientDetailImageUrl').value.trim();
     const message = document.getElementById('clientDetailMessage');
-    if (!nombre) { message.textContent = 'El nombre es requerido'; message.style.color = 'var(--danger)'; return; }
+    if (!nombre) { showToast('El nombre es requerido', 'error'); message.textContent = 'El nombre es requerido'; message.style.color = 'var(--danger)'; return; }
     message.textContent = 'Guardando...'; message.style.color = 'var(--muted)';
     document.getElementById('saveClientDetailBtn').disabled = true;
     try {
@@ -825,56 +989,25 @@ onFirebaseReady(() => {
       const cliente = clientsCache.find(c => c.id === clientId);
       if (cliente) { cliente.nombre = nombre; cliente.contacto = contacto || ''; cliente.email = email || ''; cliente.direccion = direccion || ''; if (imagen) cliente.imagen = imagen; }
       message.textContent = '✓ Guardado'; message.style.color = 'var(--success)';
+      showToast('Cliente actualizado correctamente', 'success');
       setTimeout(() => { closeClientDetail(); loadClients(); }, 1500);
-    } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; }
+    } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; showToast('Error al guardar cliente: ' + err.message, 'error'); }
     document.getElementById('saveClientDetailBtn').disabled = false;
   });
   document.querySelector('#clientDetailModal .modal-overlay')?.addEventListener('click', closeClientDetail);
 
-  // ─── IMPORTAR EXCEL ───────────────────────────────────────
-  function initImportView() {
-    const btn = document.getElementById('importExcelBtn');
-    if (btn && !btn.dataset.bound) {
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', importExcelFile);
-    }
-  }
-
+  // ─── IMPORTAR EXCEL (sin cambios) ────────────────────
+  function initImportView() { const btn = document.getElementById('importExcelBtn'); if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', importExcelFile); } }
   function normalizeText(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
-  function slugify(value, fallback) {
-    const base = normalizeText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return base || fallback;
-  }
-  function toNumber(value) {
-    if (value === null || value === undefined || value === '') return null;
-    const n = parseFloat(String(value).replace(/\s+/g,'').replace(/%/g,'').replace(/,/g,'.'));
-    return Number.isFinite(n) ? n : null;
-  }
-  function setImportProgress(percent, stage, detail) {
-    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
-    document.getElementById('importProgressFill').style.width = clamped + '%';
-    document.getElementById('importPercent').textContent = clamped + '%';
-    document.getElementById('importStage').textContent = stage;
-    document.getElementById('importDetail').textContent = detail || '';
-    document.getElementById('importMessage').textContent = detail || stage;
-  }
-  async function writeInBatches(collectionName, docs, batchSize, label, onProgress) {
-    for (let i = 0; i < docs.length; i += batchSize) {
-      const batch = db.batch();
-      const slice = docs.slice(i, i + batchSize);
-      slice.forEach(doc => batch.set(db.collection(collectionName).doc(doc.id), doc.data));
-      await batch.commit();
-      if (onProgress) onProgress(Math.min(i + slice.length, docs.length), docs.length, label);
-    }
-  }
-  async function clearCollection(name) {
-    const snap = await db.collection(name).get();
-    for (const doc of snap.docs) if (doc.ref?.delete) await doc.ref.delete();
-  }
+  function slugify(value, fallback) { const base = normalizeText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); return base || fallback; }
+  function toNumber(value) { if (value === null || value === undefined || value === '') return null; const n = parseFloat(String(value).replace(/\s+/g,'').replace(/%/g,'').replace(/,/g,'.')); return Number.isFinite(n) ? n : null; }
+  function setImportProgress(percent, stage, detail) { const clamped = Math.max(0, Math.min(100, Math.round(percent))); document.getElementById('importProgressFill').style.width = clamped + '%'; document.getElementById('importPercent').textContent = clamped + '%'; document.getElementById('importStage').textContent = stage; document.getElementById('importDetail').textContent = detail || ''; document.getElementById('importMessage').textContent = detail || stage; }
+  async function writeInBatches(collectionName, docs, batchSize, label, onProgress) { for (let i = 0; i < docs.length; i += batchSize) { const batch = db.batch(); const slice = docs.slice(i, i + batchSize); slice.forEach(doc => batch.set(db.collection(collectionName).doc(doc.id), doc.data)); await batch.commit(); if (onProgress) onProgress(Math.min(i + slice.length, docs.length), docs.length, label); } }
+  async function clearCollection(name) { const snap = await db.collection(name).get(); for (const doc of snap.docs) if (doc.ref?.delete) await doc.ref.delete(); }
   async function importExcelFile() {
     const importMessage = document.getElementById('importMessage');
     const fileInput = document.getElementById('excelFile');
-    if (!fileInput?.files?.[0]) { importMessage.textContent = 'Selecciona un archivo Excel primero.'; return; }
+    if (!fileInput?.files?.[0]) { showToast('Selecciona un archivo Excel primero', 'warning'); importMessage.textContent = 'Selecciona un archivo Excel primero.'; return; }
     try {
       setImportProgress(5, 'Leyendo archivo', 'Abriendo el libro de Excel…');
       const buffer = await fileInput.files[0].arrayBuffer();
@@ -883,7 +1016,7 @@ onFirebaseReady(() => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       const headerIndex = rows.findIndex(row => row.some(cell => normalizeText(cell).toUpperCase() === 'PRODUCTO'));
-      if (headerIndex === -1) { importMessage.textContent = 'No se encontró la fila de encabezados.'; return; }
+      if (headerIndex === -1) { showToast('No se encontró la fila de encabezados', 'error'); importMessage.textContent = 'No se encontró la fila de encabezados.'; return; }
       const header = rows[headerIndex].map(cell => normalizeText(cell));
       const productCol = header.findIndex(h => h.toUpperCase() === 'PRODUCTO');
       const presentCol = header.findIndex(h => h.toUpperCase() === 'PRESENTACION');
@@ -892,9 +1025,9 @@ onFirebaseReady(() => {
       const pvfCol = header.findIndex(h => h.toUpperCase() === 'PVF');
       const unidCol = header.findIndex(h => h.toUpperCase().includes('UNID'));
       const firstClientCol = unidCol >= 0 ? unidCol + 1 : 6;
-      if (productCol === -1) { importMessage.textContent = 'No se detectó columna PRODUCTO.'; return; }
+      if (productCol === -1) { showToast('No se detectó columna PRODUCTO', 'error'); importMessage.textContent = 'No se detectó columna PRODUCTO.'; return; }
       const clientNames = header.slice(firstClientCol).filter(n => normalizeText(n));
-      if (!clientNames.length) { importMessage.textContent = 'No se detectaron clientes en el encabezado.'; return; }
+      if (!clientNames.length) { showToast('No se detectaron clientes en el encabezado', 'error'); importMessage.textContent = 'No se detectaron clientes en el encabezado.'; return; }
       const clientDocs = clientNames.map((name, i) => ({ id: slugify(name, `client-${i+1}`), nombre: name }));
       setImportProgress(15, 'Preparando base de datos', `${clientDocs.length} clientes detectados. Limpiando colecciones…`);
       await clearCollection('clientes');
@@ -925,57 +1058,181 @@ onFirebaseReady(() => {
       await refreshCache();
       priceCache = {};
       setImportProgress(100, '✓ Importación completa', `${clientDocs.length} clientes, ${productDocs.length} productos, ${priceDocs.length} precios importados.`);
+      showToast(`Importación exitosa: ${clientDocs.length} clientes, ${productDocs.length} productos`, 'success');
       loadDashboard();
-    } catch (err) { setImportProgress(0, 'Error al importar', err.message); }
+    } catch (err) { setImportProgress(0, 'Error al importar', err.message); showToast('Error al importar: ' + err.message, 'error'); }
   }
 
-  // ─── AGREGAR IMAGEN POR URL ──────────────────────────────
-  const modal = document.getElementById('uploadModal');
+  // ─── AGREGAR IMAGEN POR URL con toast ─────────────────
+  const modalUpload = document.getElementById('uploadModal');
   const uploadBtn = document.getElementById('uploadImagesBtn');
   const closeModalBtn = document.getElementById('closeUploadModal');
-  const cancelBtn = document.getElementById('cancelUploadBtn');
-  const confirmBtn = document.getElementById('confirmUploadBtn');
-  const productSelect = document.getElementById('uploadProductSelect');
-  const imageUrlInput = document.getElementById('imageUrlInput');
-  const preview = document.getElementById('imagePreview');
-  const previewImg = document.getElementById('previewImg');
+  const cancelBtnUpload = document.getElementById('cancelUploadBtn');
+  const confirmBtnUpload = document.getElementById('confirmUploadBtn');
+  const productSelectUpload = document.getElementById('uploadProductSelect');
+  const imageUrlInputUpload = document.getElementById('imageUrlInput');
+  const previewUpload = document.getElementById('imagePreview');
+  const previewImgUpload = document.getElementById('previewImg');
   const uploadMessage = document.getElementById('uploadMessage');
-
   function openUploadModal() {
-    if (!productsCache.length) { alert('Carga los productos primero importando Excel'); return; }
-    productSelect.innerHTML = productsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-    imageUrlInput.value = '';
-    preview.classList.add('hidden');
+    if (!productsCache.length) { showToast('Carga los productos primero importando Excel', 'warning'); return; }
+    productSelectUpload.innerHTML = productsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    imageUrlInputUpload.value = '';
+    previewUpload.classList.add('hidden');
     uploadMessage.textContent = '';
-    modal.classList.remove('hidden');
+    modalUpload.classList.remove('hidden');
   }
-  function closeUploadModal() { modal.classList.add('hidden'); }
-  imageUrlInput.addEventListener('change', () => {
-    const url = imageUrlInput.value.trim();
-    if (!url) { preview.classList.add('hidden'); return; }
-    try { new URL(url); } catch { uploadMessage.textContent = 'URL no válida'; uploadMessage.style.color = 'var(--danger)'; preview.classList.add('hidden'); return; }
-    previewImg.src = url;
-    previewImg.onload = () => { preview.classList.remove('hidden'); uploadMessage.textContent = ''; };
-    previewImg.onerror = () => { uploadMessage.textContent = 'No se pudo cargar la imagen'; uploadMessage.style.color = 'var(--danger)'; preview.classList.add('hidden'); };
+  function closeUploadModal() { modalUpload.classList.add('hidden'); }
+  imageUrlInputUpload.addEventListener('change', () => {
+    const url = imageUrlInputUpload.value.trim();
+    if (!url) { previewUpload.classList.add('hidden'); return; }
+    try { new URL(url); } catch { showToast('URL no válida', 'error'); uploadMessage.textContent = 'URL no válida'; uploadMessage.style.color = 'var(--danger)'; previewUpload.classList.add('hidden'); return; }
+    previewImgUpload.src = url;
+    previewImgUpload.onload = () => { previewUpload.classList.remove('hidden'); uploadMessage.textContent = ''; };
+    previewImgUpload.onerror = () => { showToast('No se pudo cargar la imagen', 'error'); uploadMessage.textContent = 'No se pudo cargar la imagen'; uploadMessage.style.color = 'var(--danger)'; previewUpload.classList.add('hidden'); };
   });
-  confirmBtn.addEventListener('click', async () => {
-    const url = imageUrlInput.value.trim();
-    if (!url) { uploadMessage.textContent = 'Ingresa una URL de imagen'; uploadMessage.style.color = 'var(--danger)'; return; }
-    const productId = productSelect.value;
-    if (!productId) { uploadMessage.textContent = 'Selecciona un producto'; uploadMessage.style.color = 'var(--danger)'; return; }
+  confirmBtnUpload.addEventListener('click', async () => {
+    const url = imageUrlInputUpload.value.trim();
+    if (!url) { showToast('Ingresa una URL de imagen', 'warning'); uploadMessage.textContent = 'Ingresa una URL de imagen'; uploadMessage.style.color = 'var(--danger)'; return; }
+    const productId = productSelectUpload.value;
+    if (!productId) { showToast('Selecciona un producto', 'warning'); uploadMessage.textContent = 'Selecciona un producto'; uploadMessage.style.color = 'var(--danger)'; return; }
     uploadMessage.textContent = 'Guardando...'; uploadMessage.style.color = 'var(--muted)';
-    confirmBtn.disabled = true;
+    confirmBtnUpload.disabled = true;
     try {
       await db.collection('productos').doc(productId).update({ imagen: url });
       const prod = productsCache.find(p => p.id === productId);
       if (prod) prod.imagen = url;
       uploadMessage.textContent = '✓ Imagen guardada'; uploadMessage.style.color = 'var(--success)';
+      showToast('Imagen guardada correctamente', 'success');
       setTimeout(() => { closeUploadModal(); loadProducts(); }, 1500);
-    } catch (err) { uploadMessage.textContent = 'Error: ' + err.message; uploadMessage.style.color = 'var(--danger)'; }
-    confirmBtn.disabled = false;
+    } catch (err) { uploadMessage.textContent = 'Error: ' + err.message; uploadMessage.style.color = 'var(--danger)'; showToast('Error al guardar imagen: ' + err.message, 'error'); }
+    confirmBtnUpload.disabled = false;
   });
   uploadBtn.addEventListener('click', openUploadModal);
   closeModalBtn.addEventListener('click', closeUploadModal);
-  cancelBtn.addEventListener('click', closeUploadModal);
-  document.querySelector('.modal-overlay')?.addEventListener('click', closeUploadModal);
+  cancelBtnUpload.addEventListener('click', closeUploadModal);
+  document.querySelector('#uploadModal .modal-overlay')?.addEventListener('click', closeUploadModal);
+
+  // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS ───────
+  async function showVentasDetalle() {
+    const now = new Date();
+    const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    document.getElementById('ventasMesLabel').textContent = new Date().toLocaleDateString('es-PE', { month:'long', year:'numeric' });
+    const ventasMes = ventasCache.filter(v => v.mesCompra === mesKey);
+    if (ventasMes.length === 0) {
+      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td>';
+      document.getElementById('ventasTotalGeneral').textContent = 'S/0.00';
+      document.getElementById('ventasCount').textContent = '0';
+      document.getElementById('detailVentasModal').classList.remove('hidden');
+      return;
+    }
+    const priceMap = await getMultiplePrices(ventasMes);
+    let totalGeneral = 0;
+    let html = '';
+    for (const v of ventasMes) {
+      const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+      const total = precio * (v.cantidad || 0);
+      totalGeneral += total;
+      html += `<tr><td>${clientName(v.clienteId)}</td><td>${productName(v.productoId)}</td><td>${v.cantidad}</td><td>S/${precio.toFixed(2)}</td><td>S/${total.toFixed(2)}</td><td>${fmtDate(v.fechaVenta)}</td></tr>`;
+    }
+    document.getElementById('ventasDetalleTable').innerHTML = html;
+    document.getElementById('ventasTotalGeneral').textContent = `S/${totalGeneral.toFixed(2)}`;
+    document.getElementById('ventasCount').textContent = ventasMes.length;
+    document.getElementById('detailVentasModal').classList.remove('hidden');
+  }
+  async function showClientesActivosDetalle() {
+    const hoy = Date.now();
+    const hace30 = hoy - 30 * 86400000;
+    const clientesActivos = [];
+    const priceMap = await getMultiplePrices(ventasCache);
+    for (const c of clientsCache) {
+      const comprasCliente = ventasCache.filter(v => v.clienteId === c.id && v.fechaVenta);
+      if (comprasCliente.length === 0) continue;
+      const ultimaFecha = Math.max(...comprasCliente.map(v => toDateObj(v.fechaVenta)?.getTime() || 0));
+      if (ultimaFecha >= hace30) {
+        const compras30d = comprasCliente.filter(v => (toDateObj(v.fechaVenta)?.getTime() || 0) >= hace30);
+        const totalCompras = compras30d.length;
+        const totalMonto = compras30d.reduce((sum, v) => { const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0; return sum + precio * (v.cantidad || 0); }, 0);
+        clientesActivos.push({ nombre: c.nombre, ultima: new Date(ultimaFecha), totalCompras, totalMonto });
+      }
+    }
+    clientesActivos.sort((a,b) => b.ultima - a.ultima);
+    const tbody = document.getElementById('clientesActivosTable');
+    if (clientesActivos.length === 0) tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td></tr>';
+    else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
+    document.getElementById('detailClientesActivosModal').classList.remove('hidden');
+  }
+  function showAlertasDetalle() {
+    const now = new Date();
+    const hoy = now.getTime();
+    const hace30 = hoy - 30*86400000, hace60 = hoy - 60*86400000;
+    const lastBuyMap = {};
+    ventasCache.forEach(v => { const ts = toDateObj(v.fechaVenta)?.getTime() || 0; if (!lastBuyMap[v.clienteId] || ts > lastBuyMap[v.clienteId]) lastBuyMap[v.clienteId] = ts; });
+    const advertencias = [], urgentes = [];
+    clientsCache.forEach(c => {
+      const last = lastBuyMap[c.id];
+      if (!last) { advertencias.push(`${c.nombre} nunca ha comprado`); return; }
+      const diasUltima = Math.round((hoy - last) / 86400000);
+      if (last >= hace30) { /* activo */ }
+      else if (last >= hace60) advertencias.push(`${c.nombre} sin comprar hace ${diasUltima} días`);
+      else urgentes.push(`${c.nombre} sin comprar hace ${diasUltima} días`);
+    });
+    ventasCache.forEach(v => {
+      if (!v.fechaVencimiento) return;
+      const dias = daysDiff(v.fechaVencimiento);
+      if (dias === null || dias > 60) return;
+      const pnombre = productName(v.productoId), cnombre = clientName(v.clienteId), lote = v.lote ? ` (Lote: ${v.lote})` : '';
+      if (dias < 0) urgentes.push(`VENCIDO: ${pnombre}${lote} — ${cnombre}`);
+      else if (dias <= 15) urgentes.push(`Vence en ${dias} días: ${pnombre}${lote} — ${cnombre}`);
+      else advertencias.push(`Vence en ${dias} días: ${pnombre}${lote} — ${cnombre}`);
+    });
+    document.getElementById('modalWarningList').innerHTML = advertencias.length ? advertencias.map(a => `<li class="alert-item">⚠️ ${a}</li>`).join('') : '<li class="alert-item muted">Sin advertencias</li>';
+    document.getElementById('modalDangerList').innerHTML = urgentes.length ? urgentes.map(a => `<li class="alert-item">🔴 ${a}</li>`).join('') : '<li class="alert-item muted">Sin alertas urgentes</li>';
+    document.getElementById('detailAlertasModal').classList.remove('hidden');
+  }
+
+  document.getElementById('viewVentasDetail')?.addEventListener('click', showVentasDetalle);
+  document.getElementById('viewClientesActivosDetail')?.addEventListener('click', showClientesActivosDetalle);
+  document.getElementById('viewAlertasDetail')?.addEventListener('click', showAlertasDetalle);
+  document.getElementById('closeVentasModal')?.addEventListener('click', () => document.getElementById('detailVentasModal').classList.add('hidden'));
+  document.getElementById('closeVentasModalBtn')?.addEventListener('click', () => document.getElementById('detailVentasModal').classList.add('hidden'));
+  document.querySelector('#detailVentasModal .modal-overlay')?.addEventListener('click', () => document.getElementById('detailVentasModal').classList.add('hidden'));
+  document.getElementById('closeClientesActivosModal')?.addEventListener('click', () => document.getElementById('detailClientesActivosModal').classList.add('hidden'));
+  document.getElementById('closeClientesActivosModalBtn')?.addEventListener('click', () => document.getElementById('detailClientesActivosModal').classList.add('hidden'));
+  document.querySelector('#detailClientesActivosModal .modal-overlay')?.addEventListener('click', () => document.getElementById('detailClientesActivosModal').classList.add('hidden'));
+  document.getElementById('closeAlertasModal')?.addEventListener('click', () => document.getElementById('detailAlertasModal').classList.add('hidden'));
+  document.getElementById('closeAlertasModalBtn')?.addEventListener('click', () => document.getElementById('detailAlertasModal').classList.add('hidden'));
+  document.querySelector('#detailAlertasModal .modal-overlay')?.addEventListener('click', () => document.getElementById('detailAlertasModal').classList.add('hidden'));
+
+  // ─── BOTONES DE AGREGAR (eventos) ─────────────────────
+  document.getElementById('addClientBtn')?.addEventListener('click', openAddClientModal);
+  document.getElementById('closeAddClientModal')?.addEventListener('click', () => document.getElementById('addClientModal').classList.add('hidden'));
+  document.getElementById('cancelAddClientBtn')?.addEventListener('click', () => document.getElementById('addClientModal').classList.add('hidden'));
+  document.getElementById('confirmAddClientBtn')?.addEventListener('click', addNewClient);
+  document.getElementById('addProductBtn')?.addEventListener('click', openAddProductModal);
+  document.getElementById('closeAddProductModal')?.addEventListener('click', () => document.getElementById('addProductModal').classList.add('hidden'));
+  document.getElementById('cancelAddProductBtn')?.addEventListener('click', () => document.getElementById('addProductModal').classList.add('hidden'));
+  document.getElementById('confirmAddProductBtn')?.addEventListener('click', addNewProduct);
+
+  // Previsualización de imagen en modales de agregar
+  document.getElementById('newClientImageUrl')?.addEventListener('change', () => {
+    const url = document.getElementById('newClientImageUrl').value.trim();
+    const preview = document.getElementById('newClientImagePreview');
+    const img = document.getElementById('newClientPreviewImg');
+    if (!url) { preview.classList.add('hidden'); return; }
+    try { new URL(url); } catch { preview.classList.add('hidden'); return; }
+    img.src = url;
+    img.onload = () => preview.classList.remove('hidden');
+    img.onerror = () => preview.classList.add('hidden');
+  });
+  document.getElementById('newProductImageUrl')?.addEventListener('change', () => {
+    const url = document.getElementById('newProductImageUrl').value.trim();
+    const preview = document.getElementById('newProductImagePreview');
+    const img = document.getElementById('newProductPreviewImg');
+    if (!url) { preview.classList.add('hidden'); return; }
+    try { new URL(url); } catch { preview.classList.add('hidden'); return; }
+    img.src = url;
+    img.onload = () => preview.classList.remove('hidden');
+    img.onerror = () => preview.classList.add('hidden');
+  });
 });
