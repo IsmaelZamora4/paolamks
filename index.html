@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Farmacéuticos Markos — Panel Paola</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+  <script defer src="firebase.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand-wrap">
+        <div class="brand-text">
+          <span class="brand-name">Farmacéuticos</span>
+          <span class="brand-markos">Markos</span>
+        </div>
+      </div>
+      <nav>
+        <button data-view="dashboard" class="nav-btn active"><span class="nav-icon">🏠</span> Inicio</button>
+        <button data-view="register" class="nav-btn"><span class="nav-icon">➕</span> Registrar Venta</button>
+        <button data-view="history" class="nav-btn"><span class="nav-icon">📋</span> Historial</button>
+        <button data-view="clients" class="nav-btn"><span class="nav-icon">👥</span> Clientes</button>
+        <button data-view="products" class="nav-btn"><span class="nav-icon">💊</span> Productos</button>
+        <button data-view="import" class="nav-btn"><span class="nav-icon">📥</span> Importar Excel</button>
+      </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <img src="https://www.laboratoriosmarkos.com/public/front/images/lfm-1315x333.png" alt="Markos" class="topbar-logo" />
+          <div>
+            <h1 id="pageTitle">Inicio</h1>
+            <p class="subtitle">Bienvenida, Paola Rivera · Farmacéuticos Markos</p>
+          </div>
+        </div>
+        <div class="profile">
+          <div class="avatar-wrap">
+            <img id="profileImg" src="" alt="Perfil" class="avatar" />
+            <input id="profileUpload" type="file" accept="image/*" title="Cambiar foto de perfil" />
+          </div>
+        </div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section id="dashboard" class="view">
+        <div class="dashboard-grid">
+          <div class="dashboard-main">
+            <div class="kpi-row">
+              <div class="kpi-card primary"><div class="kpi-label">Ventas del mes</div><div id="totalMonth" class="kpi-value">S/0.00</div></div>
+              <div class="kpi-card"><div class="kpi-label">Clientes activos</div><div id="activeClients" class="kpi-value">0</div><div class="kpi-sub">compraron en los últimos 30 días</div></div>
+              <div class="kpi-card warn-card"><div class="kpi-label">Alertas activas</div><div id="alertsCount" class="kpi-value">0</div><div class="kpi-sub">requieren atención</div></div>
+            </div>
+            <div class="section-card">
+              <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
+              <canvas id="salesChart" style="max-height: 250px; width: 100%;"></canvas>
+            </div>
+            <div class="section-card"><div class="section-header"><div class="section-title">🔄 Próximas recompras estimadas</div></div><div id="recomprasGrid" class="recompras-grid"></div></div>
+          </div>
+          <aside class="dashboard-side">
+            <div class="section-card"><div class="section-header"><div class="section-title">⭐ Productos destacados</div></div><div id="featuredProducts" class="featured-list"></div></div>
+            <div class="section-card"><div class="section-header"><div class="section-title">🕘 Ventas recientes</div></div><ul id="recentSales" class="recent-sales-list"></ul></div>
+            <div class="section-card"><div class="section-header"><div class="section-title">🏆 Top 5 clientes (ventas totales)</div></div><canvas id="topClientsChart" style="max-height: 280px; width: 100%;"></canvas></div>
+            <div class="section-card"><div id="clockWidget" class="clock-widget"><div class="clock-header" id="clockLocation">Detectando ubicación...</div><div class="clock-display" id="clockDisplay">--:--:--</div><div class="clock-date" id="clockDate">--</div></div></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- REGISTRAR VENTA -->
+      <section id="register" class="view hidden">
+        <div class="form-card">
+          <h2 class="form-title">Registrar Venta</h2>
+          <form id="saleForm" class="sale-form">
+            <div class="form-grid">
+              <label class="form-label">Cliente <select id="clientSelect" class="form-control"></select></label>
+              <label class="form-label">Producto <select id="productSelect" class="form-control"></select></label>
+              <label class="form-label">Imagen del producto <div id="productSaleImagePreview" class="image-preview" style="width: 100px; height: 100px; margin-top: 5px;"><img id="productSaleImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label>
+              <label class="form-label">Precio (editable o automático) <div class="price-input-group"><input id="priceField" type="number" step="0.01" min="0.01" class="form-control" placeholder="Editar o cargar automático" /><button id="autoPriceBtn" type="button" class="btn-icon" title="Usar precio automático">🔄</button></div></label>
+              <label class="form-label">Cantidad <input id="cantidadField" type="number" step="1" min="1" value="1" required class="form-control" /></label>
+              <label class="form-label">Lote <input id="loteField" type="text" maxlength="50" class="form-control" placeholder="Ej: LT-2024-001" /></label>
+              <label class="form-label">Fecha de vencimiento <input id="vencimientoField" type="date" class="form-control" /></label>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn primary">Guardar venta</button><span id="saleMessage" class="form-message"></span></div>
+          </form>
+        </div>
+      </section>
+
+      <!-- HISTORIAL -->
+      <section id="history" class="view hidden">
+        <div class="table-card">
+          <div class="table-header"><h2 class="form-title">Historial de Ventas</h2><div class="filters"><input id="filterClient" class="filter-input" placeholder="🔍 Filtrar cliente…" /><input id="filterProduct" class="filter-input" placeholder="🔍 Filtrar producto…" /></div></div>
+          <div class="table-wrap"><table class="table" id="historyTable"><thead><tr><th>Cliente</th><th>Producto</th><th>Fecha venta</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th><th>Vencimiento</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- CLIENTES -->
+      <section id="clients" class="view hidden"><div class="section-card"><h2 class="form-title">Clientes</h2><div id="clientsGrid" class="clients-grid"></div></div></section>
+
+      <!-- PRODUCTOS -->
+      <section id="products" class="view hidden">
+        <div class="section-card"><div class="products-header"><h2 class="form-title">Productos</h2><button id="uploadImagesBtn" class="btn primary" title="Subir imágenes a Firebase">📤 Subir Imágenes</button></div><div id="productsGrid" class="products-grid"></div></div>
+      </section>
+
+      <!-- MODALES -->
+      <div id="uploadModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+          <div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div>
+          <div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div>
+          <div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div>
+        </div>
+      </div>
+
+      <div id="productDetailModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header"><h3>Detalles del Producto</h3><button class="modal-close" id="closeDetailModal">&times;</button></div>
+          <div class="modal-body">
+            <div id="productImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="productDetailImg" src="" alt="producto" /></div>
+            <label class="form-label">URL de la Imagen <input id="productDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label>
+            <div id="detailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="detailPreviewImg" src="" alt="preview" /></div>
+            <label class="form-label">Nombre del Producto <input id="productDetailName" type="text" maxlength="100" class="form-control" /></label>
+            <label class="form-label">Presentación <input id="productDetailPresentation" type="text" maxlength="100" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label>
+            <label class="form-label">Detalle / Descripción <textarea id="productDetailDescription" class="form-control" rows="4" style="resize: vertical; font-family: inherit;"></textarea></label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;"><label class="form-label">VVF <input type="text" class="form-control" id="productDetailVVF" readonly style="opacity: 0.6;" /></label><label class="form-label">PVF <input type="text" class="form-control" id="productDetailPVF" readonly style="opacity: 0.6;" /></label></div>
+            <span id="detailMessage" class="form-message"></span>
+          </div>
+          <div class="modal-footer"><button id="cancelDetailBtn" class="btn secondary">Cancelar</button><button id="saveDetailBtn" class="btn primary">Guardar Cambios</button></div>
+        </div>
+      </div>
+
+      <div id="clientDetailModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div>
+          <div class="modal-body">
+            <div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div>
+            <label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label>
+            <div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div>
+            <label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label>
+            <label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label>
+            <label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label>
+            <label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label>
+            <span id="clientDetailMessage" class="form-message"></span>
+          </div>
+          <div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div>
+        </div>
+      </div>
+
+      <div id="saleDetailModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 500px;">
+          <div class="modal-header"><h3>Detalles de Venta</h3><button class="modal-close" id="closeSaleDetailModal">&times;</button></div>
+          <div class="modal-body"><div class="form-label"><strong>Cliente:</strong> <span id="saleDetailCliente">—</span></div><div class="form-label"><strong>Producto:</strong> <span id="saleDetailProducto">—</span></div><div class="form-label"><strong>Cantidad:</strong> <span id="saleDetailCantidad">—</span></div><div class="form-label"><strong>Precio Unitario:</strong> <span id="saleDetailPrecio">—</span></div><div class="form-label"><strong>Total:</strong> <span id="saleDetailTotal">—</span></div><div class="form-label"><strong>Fecha de Venta:</strong> <span id="saleDetailFecha">—</span></div><div class="form-label"><strong>Lote:</strong> <span id="saleDetailLote">—</span></div><div class="form-label"><strong>Fecha Vencimiento:</strong> <span id="saleDetailVencimiento">—</span></div></div>
+          <div class="modal-footer"><button id="closeSaleDetailBtn" class="btn secondary">Cerrar</button></div>
+        </div>
+      </div>
+
+      <div id="editSaleModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 500px;">
+          <div class="modal-header"><h3>Editar Venta</h3><button class="modal-close" id="closeEditSaleModal">&times;</button></div>
+          <div class="modal-body">
+            <input type="hidden" id="editSaleId" />
+            <label class="form-label">Cliente <select id="editClienteId" class="form-control"></select></label>
+            <label class="form-label">Producto <select id="editProductoId" class="form-control"></select></label>
+            <label class="form-label">Imagen del producto <div id="editProductImagePreview" class="image-preview" style="width: 80px; height: 80px; margin-top: 5px;"><img id="editProductImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label>
+            <label class="form-label">Cantidad <input type="number" step="1" min="1" id="editCantidad" class="form-control" /></label>
+            <label class="form-label">Lote <input type="text" maxlength="50" id="editLote" class="form-control" /></label>
+            <label class="form-label">Fecha Vencimiento <input type="date" id="editFechaVencimiento" class="form-control" /></label>
+            <label class="form-label">Precio Unitario (S/) <input type="number" step="0.01" min="0.01" id="editPrecioVenta" class="form-control" /></label>
+            <span id="editSaleMessage" class="form-message"></span>
+          </div>
+          <div class="modal-footer"><button id="cancelEditSaleBtn" class="btn secondary">Cancelar</button><button id="saveEditSaleBtn" class="btn primary">Guardar Cambios</button></div>
+        </div>
+      </div>
+
+      <!-- IMPORTAR EXCEL -->
+      <section id="import" class="view hidden">
+        <div class="form-card"><h2 class="form-title">Importar Excel</h2><p class="muted">El archivo debe tener una columna <strong>PRODUCTO</strong>, columnas VVF/PVF, y una columna por cada cliente con sus precios personalizados.</p><label class="form-label" style="margin-top:16px">Archivo Excel (.xlsx / .xls) <input id="excelFile" type="file" accept=".xlsx,.xls" class="form-control" /></label><div class="import-progress"><div class="import-progress-header"><span id="importStage" class="muted">Esperando archivo…</span><span id="importPercent" class="muted">0%</span></div><div class="import-bar-wrap"><div id="importProgressFill" class="import-bar-fill" style="width:0%"></div></div><div id="importDetail" class="muted import-detail">Selecciona un archivo para comenzar.</div></div><div class="form-actions"><button id="importExcelBtn" type="button" class="btn primary">Importar archivo</button><span id="importMessage" class="form-message"></span></div></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

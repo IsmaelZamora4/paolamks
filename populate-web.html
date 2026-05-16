@@ -1,0 +1,406 @@
+<!-- populate-web.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poblar Firestore - Farmacéuticos Markos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .progress {
+            width: 100%;
+            height: 30px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: width 0.3s;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #007bff;
+            color: white;
+            padding: 20px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .stat-card p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+        }
+        #log {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-info { color: #569cd6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Poblar Firestore</h1>
+        <p>Carga los datos iniciales en tu base de datos de Firebase.</p>
+
+        <div id="status" class="status info">
+            Inicializando... Por favor espera.
+        </div>
+
+        <div class="section">
+            <h2>Estado de Conexión</h2>
+            <p><strong>Proyecto:</strong> <code>paola-mks</code></p>
+            <p id="connectionStatus">Conectando a Firebase...</p>
+        </div>
+
+        <div class="stats" id="stats" style="display:none;">
+            <div class="stat-card">
+                <p>Clientes</p>
+                <h3>23</h3>
+            </div>
+            <div class="stat-card">
+                <p>Productos</p>
+                <h3>104</h3>
+            </div>
+            <div class="stat-card">
+                <p>Precios</p>
+                <h3>2,392</h3>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Operaciones</h2>
+            <button id="btnPopulate" onclick="populateData()" disabled>
+                ▶️ Comenzar población
+            </button>
+            <button id="btnVerify" onclick="verifyData()" disabled>
+                ✓ Verificar datos
+            </button>
+            <button id="btnClear" onclick="clearData()" disabled>
+                🗑️ Limpiar todo
+            </button>
+        </div>
+
+        <div class="section">
+            <h2>Progreso</h2>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+            </div>
+            <div id="progressText">Esperando inicio...</div>
+        </div>
+
+        <div class="section">
+            <h2>Registro de Actividades</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAFhoRGUYD4ZquNd30jm-jKYs-KBjjc2YE",
+            authDomain: "paola-mks.firebaseapp.com",
+            projectId: "paola-mks",
+            storageBucket: "paola-mks.firebasestorage.app",
+            messagingSenderId: "481933797778",
+            appId: "1:481933797778:web:5e97b15a26b60abb87f94b",
+            measurementId: "G-582KTMJQ4P"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Datos de 23 clientes
+        const clientes = [
+            { id: 'patty', nombre: 'Patty González', direccion: 'Av. Principal 123', teléfono: '999123456' },
+            { id: 'client-2', nombre: 'Farmacia Central', direccion: 'Calle 45 #678', teléfono: '999234567' },
+            { id: 'client-3', nombre: 'Droguería El Éxito', direccion: 'Jr. Amazonas 234', teléfono: '999345678' },
+            { id: 'client-4', nombre: 'Farmacia Santa María', direccion: 'Av. Brasil 456', teléfono: '999456789' },
+            { id: 'client-5', nombre: 'Botica La Salud', direccion: 'Calle 12 #123', teléfono: '999567890' },
+            { id: 'client-6', nombre: 'Farmacia del Centro', direccion: 'Av. Lima 789', teléfono: '999678901' },
+            { id: 'client-7', nombre: 'Droguería Moderna', direccion: 'Calle 5 #234', teléfono: '999789012' },
+            { id: 'client-8', nombre: 'Farmacia Popular', direccion: 'Av. Arequipa 890', teléfono: '999890123' },
+            { id: 'client-9', nombre: 'Botica San Juan', direccion: 'Jr. Puno 345', teléfono: '999901234' },
+            { id: 'client-10', nombre: 'Farmacia Metropolitana', direccion: 'Av. Tacna 567', teléfono: '990012345' },
+            { id: 'client-11', nombre: 'Droguería Santa Rosa', direccion: 'Calle 8 #456', teléfono: '991123456' },
+            { id: 'client-12', nombre: 'Farmacia Integrada', direccion: 'Av. Paseo de la República 678', teléfono: '991234567' },
+            { id: 'client-13', nombre: 'Botica Global', direccion: 'Jr. Carabaya 789', teléfono: '991345678' },
+            { id: 'client-14', nombre: 'Farmacia Punto Plus', direccion: 'Av. 28 de Julio 890', teléfono: '991456789' },
+            { id: 'client-15', nombre: 'Droguería Unida', direccion: 'Calle 15 #567', teléfono: '991567890' },
+            { id: 'client-16', nombre: 'Farmacia La Paz', direccion: 'Av. Universitaria 234', teléfono: '991678901' },
+            { id: 'client-17', nombre: 'Botica Nueva Era', direccion: 'Jr. Andahuaylas 345', teléfono: '991789012' },
+            { id: 'client-18', nombre: 'Farmacia Express', direccion: 'Av. Sánchez Cerro 456', teléfono: '991890123' },
+            { id: 'client-19', nombre: 'Droguería Plus', direccion: 'Calle 20 #678', teléfono: '991901234' },
+            { id: 'client-20', nombre: 'Farmacia Cristal', direccion: 'Av. Grau 567', teléfono: '992012345' },
+            { id: 'client-21', nombre: 'Botica Salud Total', direccion: 'Jr. Ica 890', teléfono: '992123456' },
+            { id: 'client-22', nombre: 'Farmacia Nueva Esperanza', direccion: 'Av. La Marina 234', teléfono: '992234567' },
+            { id: 'client-23', nombre: 'Droguería Confianza', direccion: 'Calle 25 #789', teléfono: '992345678' }
+        ];
+
+        // Generar 104 productos
+        const productos = [];
+        for (let i = 1; i <= 104; i++) {
+            productos.push({
+                id: `p${i}`,
+                nombre: `PRODUCTO ${i}`,
+                presentacion: `Presentación ${i}`,
+                vvf: Math.round((10 + Math.random() * 15) * 100) / 100,
+                pvf: Math.round((12.5 + Math.random() * 18.75) * 100) / 100,
+                imagen: `https://via.placeholder.com/200?text=PRODUCTO%20${i}`
+            });
+        }
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateProgress(current, total, label) {
+            const percent = Math.round((current / total) * 100);
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressBar').textContent = percent + '%';
+            document.getElementById('progressText').textContent = `${label}: ${current}/${total}`;
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        async function populateData() {
+            try {
+                log('Iniciando población de Firestore...', 'info');
+                document.getElementById('btnPopulate').disabled = true;
+                setStatus('Procesando...', 'info');
+
+                // Agregar clientes
+                log(`Agregando ${clientes.length} clientes...`, 'info');
+                for (let i = 0; i < clientes.length; i++) {
+                    await db.collection('clientes').doc(clientes[i].id).set(clientes[i]);
+                    updateProgress(i + 1, clientes.length, 'Clientes');
+                }
+                log(`✓ ${clientes.length} clientes agregados`, 'success');
+
+                // Agregar productos
+                log(`Agregando ${productos.length} productos...`, 'info');
+                for (let i = 0; i < productos.length; i++) {
+                    await db.collection('productos').doc(productos[i].id).set(productos[i]);
+                    updateProgress(i + 1, productos.length, 'Productos');
+                }
+                log(`✓ ${productos.length} productos agregados`, 'success');
+
+                // Agregar precios (matriz completa)
+                const totalPrecios = clientes.length * productos.length;
+                log(`Agregando ${totalPrecios} precios...`, 'info');
+                let precioCount = 0;
+                for (const cliente of clientes) {
+                    for (const producto of productos) {
+                        const margen = 0.02 + (Math.random() * 0.03);
+                        const precio = producto.vvf * (1 + margen);
+                        const docId = `${cliente.id}_${producto.id}`;
+                        await db.collection('precios').doc(docId).set({
+                            clienteId: cliente.id,
+                            productoId: producto.id,
+                            precio: Math.round(precio * 100) / 100
+                        });
+                        precioCount++;
+                        if (precioCount % 50 === 0) {
+                            updateProgress(precioCount, totalPrecios, 'Precios');
+                        }
+                    }
+                }
+                updateProgress(totalPrecios, totalPrecios, 'Precios');
+                log(`✓ ${totalPrecios} precios agregados`, 'success');
+
+                setStatus('✓ ¡Población completada exitosamente!', 'success');
+                document.getElementById('stats').style.display = 'grid';
+                document.getElementById('btnVerify').disabled = false;
+                log('Proceso completado. Puedes ir a http://localhost:5500', 'success');
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                setStatus(`Error: ${error.message}`, 'error');
+                document.getElementById('btnPopulate').disabled = false;
+            }
+        }
+
+        async function verifyData() {
+            try {
+                log('Verificando datos...', 'info');
+                
+                const clientesSnap = await db.collection('clientes').get();
+                log(`✓ Clientes en BD: ${clientesSnap.size}`, 'success');
+                
+                const productosSnap = await db.collection('productos').get();
+                log(`✓ Productos en BD: ${productosSnap.size}`, 'success');
+                
+                const preciosSnap = await db.collection('precios').get();
+                log(`✓ Precios en BD: ${preciosSnap.size}`, 'success');
+                
+                if (clientesSnap.size === 23 && productosSnap.size === 104 && preciosSnap.size === 2392) {
+                    setStatus('✓ ¡Todos los datos están correctamente cargados!', 'success');
+                } else {
+                    setStatus('⚠ Los datos están incompletos', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Error en verificación: ${error.message}`, 'error');
+                setStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearData() {
+            if (!confirm('¿Estás seguro de que deseas eliminar todos los datos? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            try {
+                log('Eliminando datos...', 'info');
+                
+                // Eliminar clientes
+                const clientesSnap = await db.collection('clientes').get();
+                for (const doc of clientesSnap.docs) {
+                    await doc.ref.delete();
+                }
+                log(`Eliminados ${clientesSnap.size} clientes`, 'info');
+                
+                // Eliminar productos
+                const productosSnap = await db.collection('productos').get();
+                for (const doc of productosSnap.docs) {
+                    await doc.ref.delete();
+                }
+                log(`Eliminados ${productosSnap.size} productos`, 'info');
+                
+                // Eliminar precios
+                const preciosSnap = await db.collection('precios').get();
+                for (const doc of preciosSnap.docs) {
+                    await doc.ref.delete();
+                }
+                log(`Eliminados ${preciosSnap.size} precios`, 'info');
+                
+                setStatus('✓ Todos los datos han sido eliminados', 'success');
+                document.getElementById('stats').style.display = 'none';
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                setStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicializar
+        window.addEventListener('load', () => {
+            log('Conectado a Firebase', 'success');
+            log(`Proyecto: ${firebaseConfig.projectId}`, 'info');
+            document.getElementById('connectionStatus').innerHTML = `
+                ✓ <strong style="color: green;">Conectado</strong><br>
+                Proyecto: <code>${firebaseConfig.projectId}</code><br>
+                Base de datos: Firestore
+            `;
+            document.getElementById('btnPopulate').disabled = false;
+            document.getElementById('btnClear').disabled = false;
+            setStatus('Listo. Haz clic en "Comenzar población" para cargar los datos', 'success');
+        });
+    </script>
+</body>
+</html>
