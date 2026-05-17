@@ -1,6 +1,6 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA + EXPORTACIÓN A EXCEL + FILTRO EN REGISTRAR VENTA
+// VERSIÓN COMPLETA + EXPORTACIÓN + FILTRO EN REGISTRO + AGRUPACIÓN POR CLIENTE
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -421,7 +421,6 @@ onFirebaseReady(() => {
       const clienteId = e.target.value;
       if (clienteId) {
         await loadProductTableForClient(clienteId);
-        // Limpiar el filtro de búsqueda al cambiar de cliente
         const searchInput = document.getElementById('productSearchRegister');
         if (searchInput) searchInput.value = '';
       }
@@ -430,7 +429,6 @@ onFirebaseReady(() => {
     else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr>';
     window.clientSelect = newSelect;
 
-    // Configurar evento de búsqueda en tiempo real
     const searchInput = document.getElementById('productSearchRegister');
     if (searchInput) {
       searchInput.removeEventListener('input', filterProductTable);
@@ -453,7 +451,6 @@ onFirebaseReady(() => {
         row.style.display = 'none';
       }
     });
-    // Mostrar mensaje si no hay resultados
     const tbody = document.getElementById('batchTableBody');
     const noResultRow = document.getElementById('noSearchResultRow');
     if (visibleCount === 0 && searchTerm !== '') {
@@ -560,7 +557,6 @@ onFirebaseReady(() => {
       });
     });
 
-    // Aplicar filtro actual (si existe) después de cargar la tabla
     filterProductTable();
   }
 
@@ -637,7 +633,7 @@ onFirebaseReady(() => {
   }
   document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
 
-  // ─── HISTORIAL CON FILTROS AVANZADOS ──
+  // ─── HISTORIAL CON FILTROS AVANZADOS Y AGRUPACIÓN POR CLIENTE ──
   let currentFilters = {
     fechaDesde: null,
     fechaHasta: null,
@@ -674,8 +670,10 @@ onFirebaseReady(() => {
 
   async function loadHistory() {
     if (!ventasCache.length) await refreshCache();
-    const tbody = document.querySelector('#historyTable tbody');
-    tbody.innerHTML = '';
+    const container = document.querySelector('#historyTable tbody');
+    container.innerHTML = '';
+
+    // Aplicar filtros
     let filtered = [...ventasCache];
     if (currentFilters.fechaDesde) {
       const desde = new Date(currentFilters.fechaDesde);
@@ -707,34 +705,110 @@ onFirebaseReady(() => {
       filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) <= hastaVence);
     }
 
-    const sorted = filtered.sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0)).slice(0,300);
-    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</tr>'; return; }
-    const priceMap = await getMultiplePrices(sorted);
-    for (const v of sorted) {
-      const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-      const total = (precio * (v.cantidad||0)).toFixed(2);
-      const dias = daysDiff(v.fechaVencimiento);
-      let vencClass = '', vencText = fmtDate(v.fechaVencimiento);
-      if (dias !== null) { if (dias < 0) { vencClass = 'text-danger'; vencText += ' ⚠️'; } else if (dias <= 15) { vencClass = 'text-warn'; vencText += ` (${dias}d)`; } }
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${clientName(v.clienteId)}</td>
-        <td>${productName(v.productoId)}</td>
-        <td>${fmtDate(v.fechaVenta)}</td>
-        <td>${v.cantidad}</td>
-        <td>S/${precio.toFixed(2)}</td>
-        <td>S/${total}</td>
-        <td>${v.lote || '—'}</td>
-        <td class="${vencClass}">${vencText}</td>
-        <td style="text-align:center;white-space:nowrap">
-          <button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button>
-          <button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button>
-          <button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button>
-        </td>`;
-      tbody.appendChild(tr);
+    // Ordenar por fecha más reciente
+    filtered.sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0));
+
+    if (!filtered.length) {
+      container.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</tr>';
+      return;
     }
-    document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) viewSaleDetail(venta); }));
-    document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) editSale(venta); }));
-    document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', async () => { if (confirm('¿Estás seguro de eliminar esta venta?')) { try { await db.collection('ventas').doc(btn.dataset.saleId).delete(); ventasCache = ventasCache.filter(v => v.id !== btn.dataset.saleId); showToast('Venta eliminada correctamente', 'success'); loadHistory(); loadDashboard(); } catch (err) { showToast('Error al eliminar venta: ' + err.message, 'error'); } } }));
+
+    // Agrupar por cliente
+    const grouped = new Map(); // clienteId -> array de ventas
+    for (const venta of filtered) {
+      const cid = venta.clienteId;
+      if (!grouped.has(cid)) grouped.set(cid, []);
+      grouped.get(cid).push(venta);
+    }
+
+    const priceMap = await getMultiplePrices(filtered);
+
+    // Construir tabla agrupada
+    for (const [clienteId, ventasCliente] of grouped.entries()) {
+      const clienteNombre = clientName(clienteId);
+      const grupoId = `grupo-${clienteId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      
+      // Fila cabecera del cliente
+      const headerRow = document.createElement('tr');
+      headerRow.className = 'group-header';
+      headerRow.setAttribute('data-group', grupoId);
+      headerRow.style.cursor = 'pointer';
+      headerRow.style.backgroundColor = '#f1f5f9';
+      headerRow.innerHTML = `
+        <td colspan="9">
+          <span class="toggle-icon">▶</span> <strong>${clienteNombre}</strong> (${ventasCliente.length} pedidos)
+        </td>
+      `;
+      headerRow.querySelector('td').addEventListener('click', (e) => {
+        const icon = headerRow.querySelector('.toggle-icon');
+        const groupRows = document.querySelectorAll(`.group-row-${grupoId}`);
+        const isCollapsed = icon.textContent === '▶';
+        if (isCollapsed) {
+          icon.textContent = '▼';
+          groupRows.forEach(row => row.style.display = '');
+        } else {
+          icon.textContent = '▶';
+          groupRows.forEach(row => row.style.display = 'none');
+        }
+      });
+      container.appendChild(headerRow);
+
+      // Filas de ventas de este cliente
+      for (const v of ventasCliente) {
+        const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+        const total = (precio * (v.cantidad||0)).toFixed(2);
+        const dias = daysDiff(v.fechaVencimiento);
+        let vencClass = '', vencText = fmtDate(v.fechaVencimiento);
+        if (dias !== null) {
+          if (dias < 0) { vencClass = 'text-danger'; vencText += ' ⚠️'; }
+          else if (dias <= 15) { vencClass = 'text-warn'; vencText += ` (${dias}d)`; }
+        }
+        const tr = document.createElement('tr');
+        tr.className = `group-row-${grupoId}`;
+        tr.style.display = 'none'; // <--- Cambiado a 'none' para que inicie cerrado
+        tr.innerHTML = `
+          <td>${clienteNombre}</td>
+          <td>${productName(v.productoId)}</td>
+          <td>${fmtDate(v.fechaVenta)}</td>
+          <td>${v.cantidad}</td>
+          <td>S/${precio.toFixed(2)}</td>
+          <td>S/${total}</td>
+          <td>${v.lote || '—'}</td>
+          <td class="${vencClass}">${vencText}</td>
+          <td style="text-align:center;white-space:nowrap">
+            <button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button>
+            <button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button>
+            <button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button>
+          </td>
+        `;
+        container.appendChild(tr);
+      }
+    }
+
+    // Reasignar eventos de botones
+    document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', () => {
+      const saleId = btn.dataset.saleId;
+      const venta = ventasCache.find(v => v.id === saleId);
+      if (venta) viewSaleDetail(venta);
+    }));
+    document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', () => {
+      const saleId = btn.dataset.saleId;
+      const venta = ventasCache.find(v => v.id === saleId);
+      if (venta) editSale(venta);
+    }));
+    document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', async () => {
+      if (confirm('¿Estás seguro de eliminar esta venta?')) {
+        try {
+          await db.collection('ventas').doc(btn.dataset.saleId).delete();
+          ventasCache = ventasCache.filter(v => v.id !== btn.dataset.saleId);
+          showToast('Venta eliminada correctamente', 'success');
+          loadHistory();
+          loadDashboard();
+        } catch (err) {
+          showToast('Error al eliminar venta: ' + err.message, 'error');
+        }
+      }
+    }));
   }
 
   document.getElementById('toggleFiltersBtn')?.addEventListener('click', () => {
@@ -744,7 +818,7 @@ onFirebaseReady(() => {
   document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
   document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
 
-  // ─── EXPORTAR A EXCEL ─────────────────────────────────────────
+  // ─── EXPORTAR A EXCEL (exporta las ventas filtradas, no las agrupadas) ──
   async function exportAllData() {
     showToast('Preparando exportación completa...', 'info');
     try {
@@ -832,35 +906,61 @@ onFirebaseReady(() => {
     }
   }
 
+  // Exportar ventas filtradas (según los filtros actuales, sin agrupar)
   function exportFilteredSales() {
-    const tbody = document.querySelector('#historyTable tbody');
-    const rows = tbody.querySelectorAll('tr');
-    if (!rows.length || (rows.length === 1 && rows[0].innerText.includes('Sin ventas'))) {
+    // Obtener ventas filtradas actualmente (misma lógica que loadHistory)
+    let filtered = [...ventasCache];
+    if (currentFilters.fechaDesde) {
+      const desde = new Date(currentFilters.fechaDesde);
+      desde.setHours(0,0,0,0);
+      filtered = filtered.filter(v => toDateObj(v.fechaVenta) >= desde);
+    }
+    if (currentFilters.fechaHasta) {
+      const hasta = new Date(currentFilters.fechaHasta);
+      hasta.setHours(23,59,59,999);
+      filtered = filtered.filter(v => toDateObj(v.fechaVenta) <= hasta);
+    }
+    if (currentFilters.cliente) {
+      filtered = filtered.filter(v => clientName(v.clienteId).toLowerCase().includes(currentFilters.cliente));
+    }
+    if (currentFilters.producto) {
+      filtered = filtered.filter(v => productName(v.productoId).toLowerCase().includes(currentFilters.producto));
+    }
+    if (currentFilters.lote) {
+      filtered = filtered.filter(v => (v.lote || '').toLowerCase().includes(currentFilters.lote));
+    }
+    if (currentFilters.venceDesde) {
+      const desdeVence = new Date(currentFilters.venceDesde);
+      desdeVence.setHours(0,0,0,0);
+      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) >= desdeVence);
+    }
+    if (currentFilters.venceHasta) {
+      const hastaVence = new Date(currentFilters.venceHasta);
+      hastaVence.setHours(23,59,59,999);
+      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) <= hastaVence);
+    }
+
+    if (!filtered.length) {
       showToast('No hay ventas para exportar con los filtros actuales', 'warning');
       return;
     }
 
-    const salesData = [];
-    for (const row of rows) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 9) continue;
-      salesData.push({
-        Cliente: cells[0].innerText,
-        Producto: cells[1].innerText,
-        'Fecha venta': cells[2].innerText,
-        Cantidad: cells[3].innerText,
-        'Precio unit.': cells[4].innerText,
-        Total: cells[5].innerText,
-        Lote: cells[6].innerText,
-        Vencimiento: cells[7].innerText
-      });
-    }
+    const salesData = filtered.map(v => ({
+      Cliente: clientName(v.clienteId),
+      Producto: productName(v.productoId),
+      'Fecha venta': fmtDate(v.fechaVenta),
+      Cantidad: v.cantidad || 0,
+      'Precio unit.': v.precioVenta || 0,
+      Total: ((v.precioVenta || 0) * (v.cantidad || 0)).toFixed(2),
+      Lote: v.lote || '',
+      Vencimiento: fmtDate(v.fechaVencimiento)
+    }));
 
     const ws = XLSX.utils.json_to_sheet(salesData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Ventas_Filtradas');
     XLSX.writeFile(wb, `ventas_filtradas_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`);
-    showToast(`Exportadas ${salesData.length} ventas filtradas`, 'success');
+    showToast(`Exportadas ${filtered.length} ventas filtradas`, 'success');
   }
 
   document.getElementById('exportAllBtn')?.addEventListener('click', exportAllData);
@@ -1428,7 +1528,7 @@ onFirebaseReady(() => {
     document.getElementById('ventasMesLabel').textContent = new Date().toLocaleDateString('es-PE', { month:'long', year:'numeric' });
     const ventasMes = ventasCache.filter(v => v.mesCompra === mesKey);
     if (ventasMes.length === 0) {
-      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</td>';
+      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</table>';
       document.getElementById('ventasTotalGeneral').textContent = 'S/0.00';
       document.getElementById('ventasCount').textContent = '0';
       document.getElementById('detailVentasModal').classList.remove('hidden');
