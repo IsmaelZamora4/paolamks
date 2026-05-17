@@ -1,7 +1,7 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA: exportar Excel, validación fechas vencimiento,
-// modal confirmación elegante, responsive mejorado
+// VERSIÓN COMPLETA: filtro avanzado, RUC, todos los productos,
+// guardado automático de precio al registrar venta
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -85,27 +85,6 @@ onFirebaseReady(() => {
       setTimeout(() => toast.remove(), 200);
     });
   }
-
-  // ─── MODAL DE CONFIRMACIÓN ELEGANTE ────────────────────
-  let pendingConfirmAction = null;
-  function showConfirm(title, message, onConfirm) {
-    const modal = document.getElementById('confirmModal');
-    document.getElementById('confirmTitle').textContent = title;
-    document.getElementById('confirmMessage').textContent = message;
-    pendingConfirmAction = onConfirm;
-    modal.classList.remove('hidden');
-  }
-  function closeConfirmModal() {
-    document.getElementById('confirmModal').classList.add('hidden');
-    pendingConfirmAction = null;
-  }
-  document.getElementById('closeConfirmModal')?.addEventListener('click', closeConfirmModal);
-  document.getElementById('cancelConfirmBtn')?.addEventListener('click', closeConfirmModal);
-  document.getElementById('acceptConfirmBtn')?.addEventListener('click', () => {
-    if (pendingConfirmAction) pendingConfirmAction();
-    closeConfirmModal();
-  });
-  document.querySelector('#confirmModal .modal-overlay')?.addEventListener('click', closeConfirmModal);
 
   // ─── NAVEGACIÓN ──────────────────────────────────────────
   const navBtns = document.querySelectorAll('.nav-btn');
@@ -264,7 +243,7 @@ onFirebaseReady(() => {
   updateClockDisplay();
   setInterval(updateClockDisplay, 1000);
 
-  // ─── DASHBOARD ───────────────────────────────────────────
+  // ─── DASHBOARD (sin cambios relevantes) ─────────────────
   async function loadDashboard() {
     const now = new Date();
     const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -420,7 +399,7 @@ onFirebaseReady(() => {
     });
   }
 
-  // ─── REGISTRO MÚLTIPLE DE VENTAS con validación fechas ──
+  // ─── REGISTRO MÚLTIPLE DE VENTAS ────────────────────────
   async function loadFormData() {
     if (!clientsCache.length || !productsCache.length) await refreshCache();
     const clientSelect = document.getElementById('clientSelect');
@@ -432,24 +411,27 @@ onFirebaseReady(() => {
       if (clienteId) await loadProductTableForClient(clienteId);
     });
     if (newSelect.value) await loadProductTableForClient(newSelect.value);
-    else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</td>';
+    else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr>';
     window.clientSelect = newSelect;
   }
 
   async function loadProductTableForClient(clienteId) {
     const tbody = document.getElementById('batchTableBody');
-    tbody.innerHTML = '<table><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
     
+    // Obtener todos los precios existentes para este cliente
     const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clienteId).get();
-    const preciosMap = new Map();
+    const preciosMap = new Map(); // productoId -> { precio, docId }
     preciosSnapshot.docs.forEach(doc => {
       const data = doc.data();
       preciosMap.set(data.productoId, { precio: data.precio, docId: doc.id });
     });
 
+    // Construir tabla con TODOS los productos
     let html = '';
     for (const prod of productsCache) {
       const existing = preciosMap.get(prod.id);
+      // Precio: si existe precio personalizado lo usa; si no, usa PVF del producto
       const precio = existing ? existing.precio : (prod.pvf || 0);
       const priceDocId = existing ? existing.docId : '';
       const imgSrc = (prod.imagen && !prod.imagen.includes('via.placeholder')) ? prod.imagen : fallbackImg;
@@ -469,6 +451,7 @@ onFirebaseReady(() => {
     }
     tbody.innerHTML = html;
 
+    // Eventos para botones toggle
     document.querySelectorAll('.btn-toggle').forEach(btn => {
       btn.addEventListener('click', function() {
         if (this.classList.contains('active')) {
@@ -481,6 +464,7 @@ onFirebaseReady(() => {
       });
     });
 
+    // Eventos para cantidad que activan/desactivan toggle
     document.querySelectorAll('.batch-cantidad').forEach(input => {
       input.addEventListener('change', function() {
         const row = this.closest('tr');
@@ -495,6 +479,7 @@ onFirebaseReady(() => {
       });
     });
 
+    // Eventos para actualizar/crear precio base (botón 💾)
     document.querySelectorAll('.update-price-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -515,8 +500,10 @@ onFirebaseReady(() => {
             await newDocRef.set({ clienteId, productoId: productId, precio: newPrice });
             priceDocId = newDocRef.id;
             btn.dataset.priceDocId = priceDocId;
+            // Actualizar el atributo de la fila
             row.dataset.priceDocId = priceDocId;
           }
+          // Actualizar cache local
           const key = `${clienteId}_${productId}`;
           priceCache[key] = newPrice;
           showToast(`Precio base actualizado a S/ ${newPrice.toFixed(2)}`, 'success');
@@ -532,7 +519,7 @@ onFirebaseReady(() => {
     if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
     const rows = document.querySelectorAll('#batchTableBody tr');
     const ventasParaGuardar = [];
-    const precioBatch = db.batch();
+    const precioBatch = db.batch(); // Batch para actualizar/crear precios
     let precioOps = 0;
 
     for (const row of rows) {
@@ -550,24 +537,6 @@ onFirebaseReady(() => {
       const vencimiento = row.querySelector('.batch-vencimiento').value;
       if (!vencimiento) { showToast(`La fecha de vencimiento es obligatoria para ${productoId}`, 'error'); return; }
       
-      // Validar fecha de vencimiento (no puede ser anterior a hoy a menos que se confirme)
-      const fechaVencimientoObj = new Date(vencimiento);
-      const hoy = new Date();
-      hoy.setHours(0,0,0,0);
-      if (fechaVencimientoObj < hoy) {
-        const confirmar = await new Promise(resolve => {
-          showConfirm('Fecha de vencimiento pasada', `El producto ${productName(productoId)} tiene fecha de vencimiento anterior a hoy (${fmtDate(vencimiento)}). ¿Deseas registrarlo de todas formas?`, () => resolve(true));
-          // Temporizador para manejo asíncrono (modal)
-          const checkInterval = setInterval(() => {
-            if (pendingConfirmAction === null) {
-              clearInterval(checkInterval);
-              resolve(false);
-            }
-          }, 100);
-        });
-        if (!confirmar) return;
-      }
-      
       const precioInput = row.querySelector('.price-input');
       const precio = parseFloat(precioInput.value);
       if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
@@ -576,6 +545,7 @@ onFirebaseReady(() => {
       const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
       ventasParaGuardar.push({ clienteId, productoId, cantidad, lote, fechaVencimiento: new Date(vencimiento), fechaVenta: now, mesCompra, precioVenta: precio });
       
+      // También actualizar el precio base en Firestore (para que persista)
       let priceDocId = row.dataset.priceDocId;
       if (!priceDocId) {
         const newDocRef = db.collection('precios').doc();
@@ -595,21 +565,26 @@ onFirebaseReady(() => {
     btn.disabled = true;
     
     try {
+      // Ejecutar primero el batch de precios (opcional) y luego el de ventas (o combinarlos en uno solo)
+      // Para evitar límites, los ejecutamos por separado
       if (precioOps > 0) await precioBatch.commit();
       await ventasBatch.commit();
       
       for (const venta of ventasParaGuardar) ventasCache.push({ id: Date.now() + Math.random(), ...venta });
+      // Actualizar cache de precios
       for (const venta of ventasParaGuardar) {
         const key = `${venta.clienteId}_${venta.productoId}`;
         priceCache[key] = venta.precioVenta;
       }
       showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
       
+      // Limpiar campos
       document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
       document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
       document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
       document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
       
+      // Recargar la tabla del cliente actual para mostrar los nuevos precios
       await refreshCache();
       await loadProductTableForClient(clienteId);
       loadDashboard();
@@ -618,7 +593,7 @@ onFirebaseReady(() => {
   }
   document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
 
-  // ─── HISTORIAL CON FILTROS AVANZADOS Y EXPORTACIÓN ──────
+  // ─── HISTORIAL CON FILTROS AVANZADOS (sin cambios relevantes) ──
   let currentFilters = {
     fechaDesde: null,
     fechaHasta: null,
@@ -689,7 +664,7 @@ onFirebaseReady(() => {
     }
 
     const sorted = filtered.sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0)).slice(0,300);
-    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</tr>'; return; }
+    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</td>'; return; }
     const priceMap = await getMultiplePrices(sorted);
     for (const v of sorted) {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
@@ -715,20 +690,7 @@ onFirebaseReady(() => {
     }
     document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) viewSaleDetail(venta); }));
     document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) editSale(venta); }));
-    document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', () => {
-      const saleId = btn.dataset.saleId;
-      showConfirm('Eliminar venta', '¿Estás seguro de eliminar esta venta? Esta acción no se puede deshacer.', async () => {
-        try {
-          await db.collection('ventas').doc(saleId).delete();
-          ventasCache = ventasCache.filter(v => v.id !== saleId);
-          showToast('Venta eliminada correctamente', 'success');
-          loadHistory();
-          loadDashboard();
-        } catch (err) {
-          showToast('Error al eliminar venta: ' + err.message, 'error');
-        }
-      });
-    }));
+    document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', async () => { if (confirm('¿Estás seguro de eliminar esta venta?')) { try { await db.collection('ventas').doc(btn.dataset.saleId).delete(); ventasCache = ventasCache.filter(v => v.id !== btn.dataset.saleId); showToast('Venta eliminada correctamente', 'success'); loadHistory(); loadDashboard(); } catch (err) { showToast('Error al eliminar venta: ' + err.message, 'error'); } } }));
   }
 
   document.getElementById('toggleFiltersBtn')?.addEventListener('click', () => {
@@ -738,66 +700,7 @@ onFirebaseReady(() => {
   document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
   document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
 
-  // ─── EXPORTAR A EXCEL ─────────────────────────────────
-  async function exportToExcel() {
-    // Obtener ventas filtradas actualmente (las mismas que muestra loadHistory)
-    let filtered = [...ventasCache];
-    if (currentFilters.fechaDesde) {
-      const desde = new Date(currentFilters.fechaDesde);
-      desde.setHours(0,0,0,0);
-      filtered = filtered.filter(v => toDateObj(v.fechaVenta) >= desde);
-    }
-    if (currentFilters.fechaHasta) {
-      const hasta = new Date(currentFilters.fechaHasta);
-      hasta.setHours(23,59,59,999);
-      filtered = filtered.filter(v => toDateObj(v.fechaVenta) <= hasta);
-    }
-    if (currentFilters.cliente) {
-      filtered = filtered.filter(v => clientName(v.clienteId).toLowerCase().includes(currentFilters.cliente));
-    }
-    if (currentFilters.producto) {
-      filtered = filtered.filter(v => productName(v.productoId).toLowerCase().includes(currentFilters.producto));
-    }
-    if (currentFilters.lote) {
-      filtered = filtered.filter(v => (v.lote || '').toLowerCase().includes(currentFilters.lote));
-    }
-    if (currentFilters.venceDesde) {
-      const desdeVence = new Date(currentFilters.venceDesde);
-      desdeVence.setHours(0,0,0,0);
-      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) >= desdeVence);
-    }
-    if (currentFilters.venceHasta) {
-      const hastaVence = new Date(currentFilters.venceHasta);
-      hastaVence.setHours(23,59,59,999);
-      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) <= hastaVence);
-    }
-
-    const priceMap = await getMultiplePrices(filtered);
-    const data = [];
-    data.push(['Cliente', 'Producto', 'Fecha Venta', 'Cantidad', 'Precio Unit.', 'Total', 'Lote', 'Vencimiento']);
-    for (const v of filtered) {
-      const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-      const total = precio * (v.cantidad||0);
-      data.push([
-        clientName(v.clienteId),
-        productName(v.productoId),
-        fmtDate(v.fechaVenta),
-        v.cantidad,
-        precio,
-        total,
-        v.lote || '',
-        fmtDate(v.fechaVencimiento)
-      ]);
-    }
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Historial_Ventas');
-    XLSX.writeFile(wb, `historial_ventas_${new Date().toISOString().slice(0,19)}.xlsx`);
-    showToast('Exportación completada', 'success');
-  }
-  document.getElementById('exportExcelBtn')?.addEventListener('click', exportToExcel);
-
-  // ─── VISTA DETALLE/EDITAR VENTA ────────────────────────
+  // ─── VISTA DETALLE/EDITAR VENTA (sin cambios) ──
   function viewSaleDetail(venta) {
     const modal = document.getElementById('saleDetailModal');
     const precio = venta.precioVenta || 0;
@@ -865,7 +768,7 @@ onFirebaseReady(() => {
     } catch (err) { msg.textContent = 'Error: ' + err.message; msg.style.color = 'var(--danger)'; showToast('Error al actualizar venta: ' + err.message, 'error'); }
   });
 
-  // ─── CLIENTES con RUC y eliminación con modal ──────────
+  // ─── CLIENTES con RUC y eliminación ──────────────────────
   async function loadClients() {
     if (!clientsCache.length) await refreshCache();
     const grid = document.getElementById('clientsGrid');
@@ -909,15 +812,12 @@ onFirebaseReady(() => {
       grid.appendChild(card);
     }
     document.querySelectorAll('.card-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); 
-        const clientId = btn.dataset.clientId;
-        const client = clientsCache.find(c => c.id === clientId);
-        showConfirm('Eliminar cliente', `¿Eliminar a "${client?.nombre}"? Se borrarán TODOS sus precios y ventas asociadas.`, async () => await deleteClient(clientId));
-      });
+      btn.addEventListener('click', async (e) => { e.stopPropagation(); await deleteClient(btn.dataset.clientId); });
     });
   }
 
   async function deleteClient(clientId) {
+    if (!confirm('¿Eliminar este cliente? Se borrarán TODOS sus precios y ventas asociadas.')) return;
     try {
       const client = clientsCache.find(c => c.id === clientId);
       if (!client) throw new Error('Cliente no encontrado');
@@ -937,7 +837,7 @@ onFirebaseReady(() => {
     } catch (err) { showToast('Error al eliminar cliente: ' + err.message, 'error'); }
   }
 
-  // ─── PRODUCTOS con búsqueda, porcentaje y eliminación modal ──
+  // ─── PRODUCTOS con búsqueda y porcentaje con 2 decimales ──
   async function loadProducts() {
     if (!productsCache.length) await refreshCache();
     const grid = document.getElementById('productsGrid');
@@ -971,15 +871,12 @@ onFirebaseReady(() => {
       grid.appendChild(card);
     }
     document.querySelectorAll('.card-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { e.stopPropagation();
-        const productId = btn.dataset.productId;
-        const product = productsCache.find(p => p.id === productId);
-        showConfirm('Eliminar producto', `¿Eliminar "${product?.nombre}"? Se borrarán TODOS sus precios y ventas asociadas.`, async () => await deleteProduct(productId));
-      });
+      btn.addEventListener('click', async (e) => { e.stopPropagation(); await deleteProduct(btn.dataset.productId); });
     });
   }
 
   async function deleteProduct(productId) {
+    if (!confirm('¿Eliminar este producto? Se borrarán TODOS sus precios y ventas asociadas.')) return;
     try {
       const product = productsCache.find(p => p.id === productId);
       if (!product) throw new Error('Producto no encontrado');
@@ -1359,7 +1256,7 @@ onFirebaseReady(() => {
     document.getElementById('ventasMesLabel').textContent = new Date().toLocaleDateString('es-PE', { month:'long', year:'numeric' });
     const ventasMes = ventasCache.filter(v => v.mesCompra === mesKey);
     if (ventasMes.length === 0) {
-      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</td>';
+      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td>';
       document.getElementById('ventasTotalGeneral').textContent = 'S/0.00';
       document.getElementById('ventasCount').textContent = '0';
       document.getElementById('detailVentasModal').classList.remove('hidden');
@@ -1397,7 +1294,7 @@ onFirebaseReady(() => {
     }
     clientesActivos.sort((a,b) => b.ultima - a.ultima);
     const tbody = document.getElementById('clientesActivosTable');
-    if (clientesActivos.length === 0) tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td</tr>';
+    if (clientesActivos.length === 0) tbody.innerHTML = '<td><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td></tr>';
     else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
     document.getElementById('detailClientesActivosModal').classList.remove('hidden');
   }
