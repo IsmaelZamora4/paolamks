@@ -1,7 +1,6 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA: filtro avanzado, RUC, todos los productos,
-// guardado automático de precio al registrar venta
+// VERSIÓN COMPLETA + EXPORTACIÓN A EXCEL
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -90,6 +89,16 @@ onFirebaseReady(() => {
   const navBtns = document.querySelectorAll('.nav-btn');
   const views = document.querySelectorAll('.view');
   const pageTitle = document.getElementById('pageTitle');
+  const exportFilteredBtn = document.getElementById('exportFilteredBtn');
+
+  function updateExportFilteredButton() {
+    const activeView = document.querySelector('.view:not(.hidden)')?.id;
+    if (activeView === 'history') {
+      exportFilteredBtn.style.display = 'inline-flex';
+    } else {
+      exportFilteredBtn.style.display = 'none';
+    }
+  }
 
   navBtns.forEach(b => b.addEventListener('click', () => {
     navBtns.forEach(x => x.classList.remove('active'));
@@ -104,7 +113,9 @@ onFirebaseReady(() => {
     if (v === 'history')   loadHistory();
     if (v === 'products')  loadProducts();
     if (v === 'clients')   loadClients();
+    updateExportFilteredButton();
   }));
+  updateExportFilteredButton();
 
   // ─── CACHÉ GLOBAL ────────────────────────────────────────
   async function refreshCache() {
@@ -243,7 +254,7 @@ onFirebaseReady(() => {
   updateClockDisplay();
   setInterval(updateClockDisplay, 1000);
 
-  // ─── DASHBOARD (sin cambios relevantes) ─────────────────
+  // ─── DASHBOARD ─────────────────────────────────
   async function loadDashboard() {
     const now = new Date();
     const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -419,19 +430,16 @@ onFirebaseReady(() => {
     const tbody = document.getElementById('batchTableBody');
     tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
     
-    // Obtener todos los precios existentes para este cliente
     const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clienteId).get();
-    const preciosMap = new Map(); // productoId -> { precio, docId }
+    const preciosMap = new Map();
     preciosSnapshot.docs.forEach(doc => {
       const data = doc.data();
       preciosMap.set(data.productoId, { precio: data.precio, docId: doc.id });
     });
 
-    // Construir tabla con TODOS los productos
     let html = '';
     for (const prod of productsCache) {
       const existing = preciosMap.get(prod.id);
-      // Precio: si existe precio personalizado lo usa; si no, usa PVF del producto
       const precio = existing ? existing.precio : (prod.pvf || 0);
       const priceDocId = existing ? existing.docId : '';
       const imgSrc = (prod.imagen && !prod.imagen.includes('via.placeholder')) ? prod.imagen : fallbackImg;
@@ -451,7 +459,6 @@ onFirebaseReady(() => {
     }
     tbody.innerHTML = html;
 
-    // Eventos para botones toggle
     document.querySelectorAll('.btn-toggle').forEach(btn => {
       btn.addEventListener('click', function() {
         if (this.classList.contains('active')) {
@@ -464,7 +471,6 @@ onFirebaseReady(() => {
       });
     });
 
-    // Eventos para cantidad que activan/desactivan toggle
     document.querySelectorAll('.batch-cantidad').forEach(input => {
       input.addEventListener('change', function() {
         const row = this.closest('tr');
@@ -479,7 +485,6 @@ onFirebaseReady(() => {
       });
     });
 
-    // Eventos para actualizar/crear precio base (botón 💾)
     document.querySelectorAll('.update-price-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -500,10 +505,8 @@ onFirebaseReady(() => {
             await newDocRef.set({ clienteId, productoId: productId, precio: newPrice });
             priceDocId = newDocRef.id;
             btn.dataset.priceDocId = priceDocId;
-            // Actualizar el atributo de la fila
             row.dataset.priceDocId = priceDocId;
           }
-          // Actualizar cache local
           const key = `${clienteId}_${productId}`;
           priceCache[key] = newPrice;
           showToast(`Precio base actualizado a S/ ${newPrice.toFixed(2)}`, 'success');
@@ -519,7 +522,7 @@ onFirebaseReady(() => {
     if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
     const rows = document.querySelectorAll('#batchTableBody tr');
     const ventasParaGuardar = [];
-    const precioBatch = db.batch(); // Batch para actualizar/crear precios
+    const precioBatch = db.batch();
     let precioOps = 0;
 
     for (const row of rows) {
@@ -545,7 +548,6 @@ onFirebaseReady(() => {
       const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
       ventasParaGuardar.push({ clienteId, productoId, cantidad, lote, fechaVencimiento: new Date(vencimiento), fechaVenta: now, mesCompra, precioVenta: precio });
       
-      // También actualizar el precio base en Firestore (para que persista)
       let priceDocId = row.dataset.priceDocId;
       if (!priceDocId) {
         const newDocRef = db.collection('precios').doc();
@@ -565,26 +567,21 @@ onFirebaseReady(() => {
     btn.disabled = true;
     
     try {
-      // Ejecutar primero el batch de precios (opcional) y luego el de ventas (o combinarlos en uno solo)
-      // Para evitar límites, los ejecutamos por separado
       if (precioOps > 0) await precioBatch.commit();
       await ventasBatch.commit();
       
       for (const venta of ventasParaGuardar) ventasCache.push({ id: Date.now() + Math.random(), ...venta });
-      // Actualizar cache de precios
       for (const venta of ventasParaGuardar) {
         const key = `${venta.clienteId}_${venta.productoId}`;
         priceCache[key] = venta.precioVenta;
       }
       showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
       
-      // Limpiar campos
       document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
       document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
       document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
       document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
       
-      // Recargar la tabla del cliente actual para mostrar los nuevos precios
       await refreshCache();
       await loadProductTableForClient(clienteId);
       loadDashboard();
@@ -593,7 +590,7 @@ onFirebaseReady(() => {
   }
   document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
 
-  // ─── HISTORIAL CON FILTROS AVANZADOS (sin cambios relevantes) ──
+  // ─── HISTORIAL CON FILTROS AVANZADOS ──
   let currentFilters = {
     fechaDesde: null,
     fechaHasta: null,
@@ -664,7 +661,7 @@ onFirebaseReady(() => {
     }
 
     const sorted = filtered.sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0)).slice(0,300);
-    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</td>'; return; }
+    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</tr>'; return; }
     const priceMap = await getMultiplePrices(sorted);
     for (const v of sorted) {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
@@ -700,7 +697,129 @@ onFirebaseReady(() => {
   document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
   document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
 
-  // ─── VISTA DETALLE/EDITAR VENTA (sin cambios) ──
+  // ─── EXPORTAR A EXCEL ─────────────────────────────────────────
+  async function exportAllData() {
+    showToast('Preparando exportación completa...', 'info');
+    try {
+      const preciosSnapshot = await db.collection('precios').get();
+      const allPrices = preciosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const clientesSheet = clientsCache.map(c => ({
+        ID: c.id,
+        Nombre: c.nombre,
+        RUC: c.ruc || '',
+        Contacto: c.contacto || '',
+        Email: c.email || '',
+        Dirección: c.direccion || '',
+        Logo_URL: c.imagen || ''
+      }));
+
+      const productosSheet = productsCache.map(p => ({
+        ID: p.id,
+        Nombre: p.nombre,
+        Presentación: p.presentacion || '',
+        Descripción: p.descripcion || '',
+        VVF: p.vvf || 0,
+        'Dcto Base %': ((p.dctoBase || 0) * 100).toFixed(2),
+        PVF: p.pvf || 0,
+        Imagen_URL: p.imagen || ''
+      }));
+
+      const preciosSheet = allPrices.map(pr => {
+        const cliente = clientsCache.find(c => c.id === pr.clienteId);
+        const producto = productsCache.find(p => p.id === pr.productoId);
+        return {
+          Cliente_ID: pr.clienteId,
+          Cliente_Nombre: cliente ? cliente.nombre : '?',
+          Producto_ID: pr.productoId,
+          Producto_Nombre: producto ? producto.nombre : '?',
+          Precio_SOLES: pr.precio
+        };
+      });
+
+      const ventasSheet = ventasCache.map(v => ({
+        ID: v.id,
+        Cliente: clientName(v.clienteId),
+        Producto: productName(v.productoId),
+        Cantidad: v.cantidad || 0,
+        'Precio Unitario': v.precioVenta || 0,
+        Total: ((v.precioVenta || 0) * (v.cantidad || 0)).toFixed(2),
+        Lote: v.lote || '',
+        'Fecha Venta': fmtDate(v.fechaVenta),
+        'Fecha Vencimiento': fmtDate(v.fechaVencimiento),
+        MesCompra: v.mesCompra || ''
+      }));
+
+      const now = new Date();
+      const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+      let totalMes = 0;
+      for (const v of ventasCache) {
+        if (v.mesCompra === mesKey) {
+          const precio = v.precioVenta || 0;
+          totalMes += precio * (v.cantidad || 0);
+        }
+      }
+      const dashboardSheet = [{
+        'Reporte generado': now.toLocaleString('es-PE'),
+        'Ventas del mes (S/)': totalMes.toFixed(2),
+        'Clientes activos (30d)': document.getElementById('activeClients')?.innerText || '0',
+        'Alertas activas': document.getElementById('alertsCount')?.innerText || '0',
+        'Total clientes': clientsCache.length,
+        'Total productos': productsCache.length,
+        'Total ventas registradas': ventasCache.length,
+        'Total precios (combinaciones)': allPrices.length
+      }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientesSheet), 'Clientes');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productosSheet), 'Productos');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(preciosSheet), 'Precios');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ventasSheet), 'Ventas');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dashboardSheet), 'Dashboard');
+
+      XLSX.writeFile(wb, `markos_export_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`);
+      showToast('Exportación completa exitosa', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al exportar: ' + err.message, 'error');
+    }
+  }
+
+  function exportFilteredSales() {
+    const tbody = document.querySelector('#historyTable tbody');
+    const rows = tbody.querySelectorAll('tr');
+    if (!rows.length || (rows.length === 1 && rows[0].innerText.includes('Sin ventas'))) {
+      showToast('No hay ventas para exportar con los filtros actuales', 'warning');
+      return;
+    }
+
+    const salesData = [];
+    for (const row of rows) {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 9) continue;
+      salesData.push({
+        Cliente: cells[0].innerText,
+        Producto: cells[1].innerText,
+        'Fecha venta': cells[2].innerText,
+        Cantidad: cells[3].innerText,
+        'Precio unit.': cells[4].innerText,
+        Total: cells[5].innerText,
+        Lote: cells[6].innerText,
+        Vencimiento: cells[7].innerText
+      });
+    }
+
+    const ws = XLSX.utils.json_to_sheet(salesData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ventas_Filtradas');
+    XLSX.writeFile(wb, `ventas_filtradas_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`);
+    showToast(`Exportadas ${salesData.length} ventas filtradas`, 'success');
+  }
+
+  document.getElementById('exportAllBtn')?.addEventListener('click', exportAllData);
+  document.getElementById('exportFilteredBtn')?.addEventListener('click', exportFilteredSales);
+
+  // ─── VISTA DETALLE/EDITAR VENTA ──
   function viewSaleDetail(venta) {
     const modal = document.getElementById('saleDetailModal');
     const precio = venta.precioVenta || 0;
@@ -837,7 +956,7 @@ onFirebaseReady(() => {
     } catch (err) { showToast('Error al eliminar cliente: ' + err.message, 'error'); }
   }
 
-  // ─── PRODUCTOS con búsqueda y porcentaje con 2 decimales ──
+  // ─── PRODUCTOS con búsqueda y porcentaje ──
   async function loadProducts() {
     if (!productsCache.length) await refreshCache();
     const grid = document.getElementById('productsGrid');
@@ -1001,7 +1120,7 @@ onFirebaseReady(() => {
     finally { btn.disabled = false; }
   }
 
-  // ─── DETALLES PRODUCTO con edición y cálculo de PVF ──
+  // ─── DETALLES PRODUCTO ──
   function openProductDetail(product) {
     const modal = document.getElementById('productDetailModal');
     document.getElementById('productDetailName').value = product.nombre || '';
@@ -1132,8 +1251,14 @@ onFirebaseReady(() => {
   });
   document.querySelector('#clientDetailModal .modal-overlay')?.addEventListener('click', closeClientDetail);
 
-  // ─── IMPORTAR EXCEL (sin cambios) ────────────────────
-  function initImportView() { const btn = document.getElementById('importExcelBtn'); if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', importExcelFile); } }
+  // ─── IMPORTAR EXCEL ────────────────────────────────────
+  function initImportView() { 
+    const btn = document.getElementById('importExcelBtn'); 
+    if (btn && !btn.dataset.bound) { 
+      btn.dataset.bound = '1'; 
+      btn.addEventListener('click', importExcelFile); 
+    } 
+  }
   function normalizeText(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
   function slugify(value, fallback) { const base = normalizeText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); return base || fallback; }
   function toNumber(value) { if (value === null || value === undefined || value === '') return null; const n = parseFloat(String(value).replace(/\s+/g,'').replace(/%/g,'').replace(/,/g,'.')); return Number.isFinite(n) ? n : null; }
@@ -1249,14 +1374,14 @@ onFirebaseReady(() => {
   cancelBtnUpload.addEventListener('click', closeUploadModal);
   document.querySelector('#uploadModal .modal-overlay')?.addEventListener('click', closeUploadModal);
 
-  // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS (sin cambios) ───────
+  // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS ───────
   async function showVentasDetalle() {
     const now = new Date();
     const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
     document.getElementById('ventasMesLabel').textContent = new Date().toLocaleDateString('es-PE', { month:'long', year:'numeric' });
     const ventasMes = ventasCache.filter(v => v.mesCompra === mesKey);
     if (ventasMes.length === 0) {
-      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td>';
+      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</tr>';
       document.getElementById('ventasTotalGeneral').textContent = 'S/0.00';
       document.getElementById('ventasCount').textContent = '0';
       document.getElementById('detailVentasModal').classList.remove('hidden');
@@ -1294,7 +1419,7 @@ onFirebaseReady(() => {
     }
     clientesActivos.sort((a,b) => b.ultima - a.ultima);
     const tbody = document.getElementById('clientesActivosTable');
-    if (clientesActivos.length === 0) tbody.innerHTML = '<td><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td></tr>';
+    if (clientesActivos.length === 0) tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td</tr>';
     else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
     document.getElementById('detailClientesActivosModal').classList.remove('hidden');
   }
