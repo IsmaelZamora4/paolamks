@@ -1,6 +1,6 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA + EXPORTACIÓN A EXCEL
+// VERSIÓN COMPLETA + EXPORTACIÓN A EXCEL + FILTRO EN REGISTRAR VENTA
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -108,7 +108,7 @@ onFirebaseReady(() => {
     document.getElementById(v).classList.remove('hidden');
     pageTitle.textContent = b.textContent.trim();
     if (v === 'dashboard') loadDashboard();
-    if (v === 'register')  loadFormData();
+    if (v === 'register')  { loadFormData(); }
     if (v === 'import')    initImportView();
     if (v === 'history')   loadHistory();
     if (v === 'products')  loadProducts();
@@ -410,7 +410,7 @@ onFirebaseReady(() => {
     });
   }
 
-  // ─── REGISTRO MÚLTIPLE DE VENTAS ────────────────────────
+  // ─── REGISTRO MÚLTIPLE DE VENTAS con filtro ────────────────────────
   async function loadFormData() {
     if (!clientsCache.length || !productsCache.length) await refreshCache();
     const clientSelect = document.getElementById('clientSelect');
@@ -419,11 +419,55 @@ onFirebaseReady(() => {
     clientSelect.parentNode.replaceChild(newSelect, clientSelect);
     newSelect.addEventListener('change', async (e) => {
       const clienteId = e.target.value;
-      if (clienteId) await loadProductTableForClient(clienteId);
+      if (clienteId) {
+        await loadProductTableForClient(clienteId);
+        // Limpiar el filtro de búsqueda al cambiar de cliente
+        const searchInput = document.getElementById('productSearchRegister');
+        if (searchInput) searchInput.value = '';
+      }
     });
     if (newSelect.value) await loadProductTableForClient(newSelect.value);
     else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr>';
     window.clientSelect = newSelect;
+
+    // Configurar evento de búsqueda en tiempo real
+    const searchInput = document.getElementById('productSearchRegister');
+    if (searchInput) {
+      searchInput.removeEventListener('input', filterProductTable);
+      searchInput.addEventListener('input', filterProductTable);
+    }
+  }
+
+  function filterProductTable() {
+    const searchTerm = document.getElementById('productSearchRegister')?.value.toLowerCase().trim() || '';
+    const rows = document.querySelectorAll('#batchTableBody tr');
+    let visibleCount = 0;
+    rows.forEach(row => {
+      const nombre = row.querySelector('td:nth-child(2)')?.innerText.toLowerCase() || '';
+      const presentacion = row.querySelector('td:nth-child(3)')?.innerText.toLowerCase() || '';
+      const matches = searchTerm === '' || nombre.includes(searchTerm) || presentacion.includes(searchTerm);
+      if (matches) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+    // Mostrar mensaje si no hay resultados
+    const tbody = document.getElementById('batchTableBody');
+    const noResultRow = document.getElementById('noSearchResultRow');
+    if (visibleCount === 0 && searchTerm !== '') {
+      if (!noResultRow) {
+        const tr = document.createElement('tr');
+        tr.id = 'noSearchResultRow';
+        tr.innerHTML = `<td colspan="8" class="muted" style="text-align:center;">No hay productos que coincidan con "${searchTerm}"</td>`;
+        tbody.appendChild(tr);
+      } else {
+        noResultRow.style.display = '';
+      }
+    } else {
+      if (noResultRow) noResultRow.style.display = 'none';
+    }
   }
 
   async function loadProductTableForClient(clienteId) {
@@ -515,6 +559,9 @@ onFirebaseReady(() => {
         }
       });
     });
+
+    // Aplicar filtro actual (si existe) después de cargar la tabla
+    filterProductTable();
   }
 
   async function registerBatchSales() {
@@ -1381,7 +1428,7 @@ onFirebaseReady(() => {
     document.getElementById('ventasMesLabel').textContent = new Date().toLocaleDateString('es-PE', { month:'long', year:'numeric' });
     const ventasMes = ventasCache.filter(v => v.mesCompra === mesKey);
     if (ventasMes.length === 0) {
-      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</tr>';
+      document.getElementById('ventasDetalleTable').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No hay ventas en el mes actual</td</td>';
       document.getElementById('ventasTotalGeneral').textContent = 'S/0.00';
       document.getElementById('ventasCount').textContent = '0';
       document.getElementById('detailVentasModal').classList.remove('hidden');
@@ -1419,7 +1466,7 @@ onFirebaseReady(() => {
     }
     clientesActivos.sort((a,b) => b.ultima - a.ultima);
     const tbody = document.getElementById('clientesActivosTable');
-    if (clientesActivos.length === 0) tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td</tr>';
+    if (clientesActivos.length === 0) tbody.innerHTML = '<td><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td</tr>';
     else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
     document.getElementById('detailClientesActivosModal').classList.remove('hidden');
   }

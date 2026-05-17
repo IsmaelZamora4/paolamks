@@ -131,13 +131,16 @@
         </div>
       </div>
 
-      <!-- REGISTRAR VENTA MÚLTIPLE -->
+      <!-- REGISTRAR VENTA MÚLTIPLE con búsqueda -->
       <section id="register" class="view hidden">
         <div class="form-card" style="max-width: 100%;">
           <h2 class="form-title">Registrar Venta Múltiple</h2>
-          <div class="form-grid" style="grid-template-columns: 1fr;">
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
             <label class="form-label">Cliente
               <select id="clientSelect" class="form-control"></select>
+            </label>
+            <label class="form-label">🔍 Buscar producto
+              <input type="text" id="productSearchRegister" class="form-control" placeholder="Nombre o presentación...">
             </label>
           </div>
           <div id="productTableContainer" style="margin-top: 20px; overflow-x: auto; width: 100%;">
@@ -254,7 +257,7 @@
         </div>
       </section>
 
-      <!-- MODALES (sin cambios) -->
+      <!-- MODALES -->
       <div id="addClientModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3>➕ Nuevo Cliente</h3><button class="modal-close" id="closeAddClientModal">&times;</button></div><div class="modal-body"><label class="form-label">Nombre del Cliente <input type="text" id="newClientName" class="form-control" maxlength="100" placeholder="Ej: Farmacia Ejemplo" /></label><label class="form-label">RUC <input type="text" id="newClientRuc" class="form-control" maxlength="11" placeholder="Ej: 20123456789" /></label><label class="form-label">Contacto / Teléfono <input type="text" id="newClientContact" class="form-control" placeholder="+51 999 123 456" /></label><label class="form-label">Email <input type="email" id="newClientEmail" class="form-control" placeholder="cliente@ejemplo.com" /></label><label class="form-label">Dirección <input type="text" id="newClientAddress" class="form-control" placeholder="Av. Principal 123" /></label><label class="form-label">URL del Logo <input type="url" id="newClientImageUrl" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="newClientImagePreview" class="image-preview hidden"><img id="newClientPreviewImg" src="" alt="preview" style="max-height: 100px;" /></div><span id="addClientMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelAddClientBtn" class="btn secondary">Cancelar</button><button id="confirmAddClientBtn" class="btn primary">Crear Cliente</button></div></div></div>
       <div id="addProductModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3>➕ Nuevo Producto</h3><button class="modal-close" id="closeAddProductModal">&times;</button></div><div class="modal-body"><label class="form-label">Nombre del Producto <input type="text" id="newProductName" class="form-control" maxlength="100" placeholder="Ej: Producto X" /></label><label class="form-label">Presentación <input type="text" id="newProductPresentation" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label><label class="form-label">Detalle / Descripción <textarea id="newProductDescription" class="form-control" rows="3"></textarea></label><label class="form-label">VVF (S/) <input type="number" step="0.01" id="newProductVVF" class="form-control" placeholder="0.00" /></label><label class="form-label">Dcto. Base (%) <input type="number" step="any" id="newProductDctoBase" class="form-control" placeholder="0" /></label><label class="form-label">PVF (S/) <input type="number" step="0.01" id="newProductPVF" class="form-control" placeholder="0.00" /></label><label class="form-label">URL de la Imagen <input type="url" id="newProductImageUrl" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="newProductImagePreview" class="image-preview hidden"><img id="newProductPreviewImg" src="" alt="preview" /></div><span id="addProductMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelAddProductBtn" class="btn secondary">Cancelar</button><button id="confirmAddProductBtn" class="btn primary">Crear Producto</button></div></div></div>
       <div id="uploadModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content"><div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div><div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div></div></div>
