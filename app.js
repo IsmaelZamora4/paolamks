@@ -1,7 +1,7 @@
 // ============================================================
 // app.js — Panel Paola · Farmacéuticos Markos
-// VERSIÓN COMPLETA con precios editables en venta, actualización de precios base,
-// cálculo automático de PVF, CRUD completo, footer animado
+// VERSIÓN COMPLETA: filtro avanzado, RUC, todos los productos,
+// guardado automático de precio al registrar venta
 // ============================================================
 
 function onFirebaseReady(cb) {
@@ -243,7 +243,7 @@ onFirebaseReady(() => {
   updateClockDisplay();
   setInterval(updateClockDisplay, 1000);
 
-  // ─── DASHBOARD ───────────────────────────────────────────
+  // ─── DASHBOARD (sin cambios relevantes) ─────────────────
   async function loadDashboard() {
     const now = new Date();
     const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -399,7 +399,7 @@ onFirebaseReady(() => {
     });
   }
 
-  // ─── REGISTRO MÚLTIPLE DE VENTAS con precio editable ────
+  // ─── REGISTRO MÚLTIPLE DE VENTAS ────────────────────────
   async function loadFormData() {
     if (!clientsCache.length || !productsCache.length) await refreshCache();
     const clientSelect = document.getElementById('clientSelect');
@@ -411,29 +411,29 @@ onFirebaseReady(() => {
       if (clienteId) await loadProductTableForClient(clienteId);
     });
     if (newSelect.value) await loadProductTableForClient(newSelect.value);
-    else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td></tr>';
+    else document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr>';
     window.clientSelect = newSelect;
   }
 
   async function loadProductTableForClient(clienteId) {
     const tbody = document.getElementById('batchTableBody');
     tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
+    
+    // Obtener todos los precios existentes para este cliente
     const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clienteId).get();
-    const preciosMap = new Map();
+    const preciosMap = new Map(); // productoId -> { precio, docId }
     preciosSnapshot.docs.forEach(doc => {
       const data = doc.data();
       preciosMap.set(data.productoId, { precio: data.precio, docId: doc.id });
     });
-    const productosConPrecio = productsCache.filter(p => preciosMap.has(p.id));
-    if (productosConPrecio.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Este cliente no tiene precios asignados aún.</td></tr>';
-      return;
-    }
+
+    // Construir tabla con TODOS los productos
     let html = '';
-    for (const prod of productosConPrecio) {
-      const precioObj = preciosMap.get(prod.id);
-      const precio = precioObj.precio;
-      const priceDocId = precioObj.docId;
+    for (const prod of productsCache) {
+      const existing = preciosMap.get(prod.id);
+      // Precio: si existe precio personalizado lo usa; si no, usa PVF del producto
+      const precio = existing ? existing.precio : (prod.pvf || 0);
+      const priceDocId = existing ? existing.docId : '';
       const imgSrc = (prod.imagen && !prod.imagen.includes('via.placeholder')) ? prod.imagen : fallbackImg;
       html += `<tr data-producto-id="${prod.id}" data-price-doc-id="${priceDocId}">
           <td style="width: 60px;"><img src="${imgSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px;" onerror="this.src='${fallbackImg}'"></td>
@@ -441,7 +441,7 @@ onFirebaseReady(() => {
           <td>${prod.presentacion || ''}</td>
           <td class="price-cell">
             <input type="number" step="0.01" class="form-control price-input" value="${precio.toFixed(2)}" style="width:100px; display:inline-block;">
-            <button type="button" class="btn-icon update-price-btn" data-product-id="${prod.id}" data-price-doc-id="${priceDocId}" style="margin-left:5px;" title="Actualizar precio base para este cliente">💾</button>
+            <button type="button" class="btn-icon update-price-btn" data-product-id="${prod.id}" data-price-doc-id="${priceDocId}" style="margin-left:5px;" title="Actualizar/crear precio base para este cliente">💾</button>
           </td>
           <td><input type="number" class="form-control batch-cantidad" style="width:80px;" min="0" step="1" value="0"></td>
           <td><input type="text" class="form-control batch-lote" style="width:120px;" placeholder="Lote"></td>
@@ -479,12 +479,12 @@ onFirebaseReady(() => {
       });
     });
 
-    // Eventos para actualizar precio base
+    // Eventos para actualizar/crear precio base (botón 💾)
     document.querySelectorAll('.update-price-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const productId = btn.dataset.productId;
-        const priceDocId = btn.dataset.priceDocId;
+        let priceDocId = btn.dataset.priceDocId;
         const row = btn.closest('tr');
         const priceInput = row.querySelector('.price-input');
         const newPrice = parseFloat(priceInput.value);
@@ -493,7 +493,16 @@ onFirebaseReady(() => {
           return;
         }
         try {
-          await db.collection('precios').doc(priceDocId).update({ precio: newPrice });
+          if (priceDocId) {
+            await db.collection('precios').doc(priceDocId).update({ precio: newPrice });
+          } else {
+            const newDocRef = db.collection('precios').doc();
+            await newDocRef.set({ clienteId, productoId: productId, precio: newPrice });
+            priceDocId = newDocRef.id;
+            btn.dataset.priceDocId = priceDocId;
+            // Actualizar el atributo de la fila
+            row.dataset.priceDocId = priceDocId;
+          }
           // Actualizar cache local
           const key = `${clienteId}_${productId}`;
           priceCache[key] = newPrice;
@@ -510,73 +519,188 @@ onFirebaseReady(() => {
     if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
     const rows = document.querySelectorAll('#batchTableBody tr');
     const ventasParaGuardar = [];
+    const precioBatch = db.batch(); // Batch para actualizar/crear precios
+    let precioOps = 0;
+
     for (const row of rows) {
       const productoId = row.dataset.productoId;
       const toggleBtn = row.querySelector('.btn-toggle');
       if (!toggleBtn || !toggleBtn.classList.contains('active')) continue;
+      
       const cantidadInput = row.querySelector('.batch-cantidad');
       const cantidad = parseInt(cantidadInput.value);
       if (isNaN(cantidad) || cantidad <= 0) { showToast(`La cantidad para ${productoId} debe ser un número positivo`, 'error'); return; }
+      
       const lote = row.querySelector('.batch-lote').value.trim();
       if (!lote) { showToast(`El lote es obligatorio para ${productoId}`, 'error'); return; }
+      
       const vencimiento = row.querySelector('.batch-vencimiento').value;
       if (!vencimiento) { showToast(`La fecha de vencimiento es obligatoria para ${productoId}`, 'error'); return; }
+      
       const precioInput = row.querySelector('.price-input');
       const precio = parseFloat(precioInput.value);
       if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
+      
       const now = new Date();
       const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
       ventasParaGuardar.push({ clienteId, productoId, cantidad, lote, fechaVencimiento: new Date(vencimiento), fechaVenta: now, mesCompra, precioVenta: precio });
+      
+      // También actualizar el precio base en Firestore (para que persista)
+      let priceDocId = row.dataset.priceDocId;
+      if (!priceDocId) {
+        const newDocRef = db.collection('precios').doc();
+        priceDocId = newDocRef.id;
+        row.dataset.priceDocId = priceDocId;
+      }
+      precioBatch.set(db.collection('precios').doc(priceDocId), { clienteId, productoId, precio });
+      precioOps++;
     }
+    
     if (ventasParaGuardar.length === 0) { showToast('Activa al menos un producto con cantidad > 0', 'warning'); return; }
-    const batch = db.batch();
-    for (const venta of ventasParaGuardar) { batch.set(db.collection('ventas').doc(), venta); }
+    
+    const ventasBatch = db.batch();
+    for (const venta of ventasParaGuardar) { ventasBatch.set(db.collection('ventas').doc(), venta); }
+    
     const btn = document.getElementById('registerBatchBtn');
     btn.disabled = true;
+    
     try {
-      await batch.commit();
+      // Ejecutar primero el batch de precios (opcional) y luego el de ventas (o combinarlos en uno solo)
+      // Para evitar límites, los ejecutamos por separado
+      if (precioOps > 0) await precioBatch.commit();
+      await ventasBatch.commit();
+      
       for (const venta of ventasParaGuardar) ventasCache.push({ id: Date.now() + Math.random(), ...venta });
-      showToast(`✓ ${ventasParaGuardar.length} ventas registradas correctamente`, 'success');
+      // Actualizar cache de precios
+      for (const venta of ventasParaGuardar) {
+        const key = `${venta.clienteId}_${venta.productoId}`;
+        priceCache[key] = venta.precioVenta;
+      }
+      showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
+      
+      // Limpiar campos
       document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
       document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
       document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
       document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
+      
+      // Recargar la tabla del cliente actual para mostrar los nuevos precios
       await refreshCache();
+      await loadProductTableForClient(clienteId);
       loadDashboard();
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
     finally { btn.disabled = false; }
   }
   document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
 
-  // ─── HISTORIAL Y ACCIONES ──────────────────────────────
+  // ─── HISTORIAL CON FILTROS AVANZADOS (sin cambios relevantes) ──
+  let currentFilters = {
+    fechaDesde: null,
+    fechaHasta: null,
+    cliente: '',
+    producto: '',
+    lote: '',
+    venceDesde: null,
+    venceHasta: null
+  };
+
+  function applyFilters() {
+    currentFilters = {
+      fechaDesde: document.getElementById('filterFechaDesde').value,
+      fechaHasta: document.getElementById('filterFechaHasta').value,
+      cliente: document.getElementById('filterCliente').value.toLowerCase(),
+      producto: document.getElementById('filterProducto').value.toLowerCase(),
+      lote: document.getElementById('filterLote').value.toLowerCase(),
+      venceDesde: document.getElementById('filterVenceDesde').value,
+      venceHasta: document.getElementById('filterVenceHasta').value
+    };
+    loadHistory();
+  }
+
+  function clearFilters() {
+    document.getElementById('filterFechaDesde').value = '';
+    document.getElementById('filterFechaHasta').value = '';
+    document.getElementById('filterCliente').value = '';
+    document.getElementById('filterProducto').value = '';
+    document.getElementById('filterLote').value = '';
+    document.getElementById('filterVenceDesde').value = '';
+    document.getElementById('filterVenceHasta').value = '';
+    applyFilters();
+  }
+
   async function loadHistory() {
     if (!ventasCache.length) await refreshCache();
     const tbody = document.querySelector('#historyTable tbody');
     tbody.innerHTML = '';
-    const sorted = [...ventasCache].sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0)).slice(0,300);
-    const filterCliente = document.getElementById('filterClient').value.toLowerCase();
-    const filterProducto = document.getElementById('filterProduct').value.toLowerCase();
-    const rows = sorted.filter(v => clientName(v.clienteId).toLowerCase().includes(filterCliente) && productName(v.productoId).toLowerCase().includes(filterProducto));
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin ventas registradas</td</tr>'; return; }
-    const priceMap = await getMultiplePrices(rows);
-    rows.forEach(v => {
+    let filtered = [...ventasCache];
+    if (currentFilters.fechaDesde) {
+      const desde = new Date(currentFilters.fechaDesde);
+      desde.setHours(0,0,0,0);
+      filtered = filtered.filter(v => toDateObj(v.fechaVenta) >= desde);
+    }
+    if (currentFilters.fechaHasta) {
+      const hasta = new Date(currentFilters.fechaHasta);
+      hasta.setHours(23,59,59,999);
+      filtered = filtered.filter(v => toDateObj(v.fechaVenta) <= hasta);
+    }
+    if (currentFilters.cliente) {
+      filtered = filtered.filter(v => clientName(v.clienteId).toLowerCase().includes(currentFilters.cliente));
+    }
+    if (currentFilters.producto) {
+      filtered = filtered.filter(v => productName(v.productoId).toLowerCase().includes(currentFilters.producto));
+    }
+    if (currentFilters.lote) {
+      filtered = filtered.filter(v => (v.lote || '').toLowerCase().includes(currentFilters.lote));
+    }
+    if (currentFilters.venceDesde) {
+      const desdeVence = new Date(currentFilters.venceDesde);
+      desdeVence.setHours(0,0,0,0);
+      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) >= desdeVence);
+    }
+    if (currentFilters.venceHasta) {
+      const hastaVence = new Date(currentFilters.venceHasta);
+      hastaVence.setHours(23,59,59,999);
+      filtered = filtered.filter(v => toDateObj(v.fechaVencimiento) <= hastaVence);
+    }
+
+    const sorted = filtered.sort((a,b)=> (b.fechaVenta?.seconds||0) - (a.fechaVenta?.seconds||0)).slice(0,300);
+    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Sin ventas que coincidan con los filtros</td</td>'; return; }
+    const priceMap = await getMultiplePrices(sorted);
+    for (const v of sorted) {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
       const total = (precio * (v.cantidad||0)).toFixed(2);
       const dias = daysDiff(v.fechaVencimiento);
       let vencClass = '', vencText = fmtDate(v.fechaVencimiento);
       if (dias !== null) { if (dias < 0) { vencClass = 'text-danger'; vencText += ' ⚠️'; } else if (dias <= 15) { vencClass = 'text-warn'; vencText += ` (${dias}d)`; } }
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${clientName(v.clienteId)}</td><td>${productName(v.productoId)}</td><td>${fmtDate(v.fechaVenta)}</td><td>${v.cantidad}</td><td>S/${precio.toFixed(2)}</td><td>S/${total}</td><td class="${vencClass}">${vencText}</td>
-        <td style="text-align:center;white-space:nowrap"><button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button><button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button><button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button></td>`;
+      tr.innerHTML = `<td>${clientName(v.clienteId)}</td>
+        <td>${productName(v.productoId)}</td>
+        <td>${fmtDate(v.fechaVenta)}</td>
+        <td>${v.cantidad}</td>
+        <td>S/${precio.toFixed(2)}</td>
+        <td>S/${total}</td>
+        <td>${v.lote || '—'}</td>
+        <td class="${vencClass}">${vencText}</td>
+        <td style="text-align:center;white-space:nowrap">
+          <button class="btn-action btn-view" data-sale-id="${v.id}" title="Ver detalles">👁️</button>
+          <button class="btn-action btn-edit" data-sale-id="${v.id}" title="Editar">✏️</button>
+          <button class="btn-action btn-delete" data-sale-id="${v.id}" title="Eliminar">🗑️</button>
+        </td>`;
       tbody.appendChild(tr);
-    });
+    }
     document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) viewSaleDetail(venta); }));
     document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', () => { const saleId = btn.dataset.saleId; const venta = ventasCache.find(v => v.id === saleId); if (venta) editSale(venta); }));
     document.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', async () => { if (confirm('¿Estás seguro de eliminar esta venta?')) { try { await db.collection('ventas').doc(btn.dataset.saleId).delete(); ventasCache = ventasCache.filter(v => v.id !== btn.dataset.saleId); showToast('Venta eliminada correctamente', 'success'); loadHistory(); loadDashboard(); } catch (err) { showToast('Error al eliminar venta: ' + err.message, 'error'); } } }));
   }
-  document.getElementById('filterClient').addEventListener('input', () => { if (!document.getElementById('history').classList.contains('hidden')) loadHistory(); });
-  document.getElementById('filterProduct').addEventListener('input', () => { if (!document.getElementById('history').classList.contains('hidden')) loadHistory(); });
 
+  document.getElementById('toggleFiltersBtn')?.addEventListener('click', () => {
+    const panel = document.getElementById('advancedFilters');
+    panel.classList.toggle('hidden');
+  });
+  document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
+  document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
+
+  // ─── VISTA DETALLE/EDITAR VENTA (sin cambios) ──
   function viewSaleDetail(venta) {
     const modal = document.getElementById('saleDetailModal');
     const precio = venta.precioVenta || 0;
@@ -644,7 +768,7 @@ onFirebaseReady(() => {
     } catch (err) { msg.textContent = 'Error: ' + err.message; msg.style.color = 'var(--danger)'; showToast('Error al actualizar venta: ' + err.message, 'error'); }
   });
 
-  // ─── CLIENTES con eliminación ─────────────────────────
+  // ─── CLIENTES con RUC y eliminación ──────────────────────
   async function loadClients() {
     if (!clientsCache.length) await refreshCache();
     const grid = document.getElementById('clientsGrid');
@@ -670,7 +794,11 @@ onFirebaseReady(() => {
         <button class="card-delete-btn" data-client-id="${c.id}" title="Eliminar cliente">🗑️</button>
         <div class="client-header">
           <img src="${c.imagen || getClientLogo(c.nombre)}" alt="${c.nombre}" class="client-logo" onerror="this.src='${fallbackImg}'" />
-          <div><div class="client-nombre">${c.nombre}</div><span class="status ${estadoClass}">${estadoLabel}</span></div>
+          <div>
+            <div class="client-nombre">${c.nombre}</div>
+            ${c.ruc ? `<div class="client-ruc">RUC: ${c.ruc}</div>` : ''}
+            <span class="status ${estadoClass}">${estadoLabel}</span>
+          </div>
         </div>
         <div class="client-stats">
           <div><span class="stat-label">Última compra</span><span class="stat-val">${lastTs ? fmtDate({ seconds: lastTs/1000 }) : '—'}</span></div>
@@ -709,18 +837,24 @@ onFirebaseReady(() => {
     } catch (err) { showToast('Error al eliminar cliente: ' + err.message, 'error'); }
   }
 
-  // ─── PRODUCTOS con eliminación y cálculo automático de PVF ──
+  // ─── PRODUCTOS con búsqueda y porcentaje con 2 decimales ──
   async function loadProducts() {
     if (!productsCache.length) await refreshCache();
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = '';
     const ventasByProd = {};
     ventasCache.forEach(v => { ventasByProd[v.productoId] = (ventasByProd[v.productoId]||0)+(v.cantidad||0); });
-    for (const p of productsCache) {
+    const searchTerm = document.getElementById('productSearchInput')?.value.toLowerCase() || '';
+    let filtered = [...productsCache];
+    if (searchTerm) {
+      filtered = filtered.filter(p => p.nombre.toLowerCase().includes(searchTerm) || (p.presentacion && p.presentacion.toLowerCase().includes(searchTerm)));
+    }
+    for (const p of filtered) {
       const imgSrc = (p.imagen && !p.imagen.includes('via.placeholder')) ? p.imagen : fallbackImg;
       const card = document.createElement('div');
       card.className = 'product-card';
       card.style.cursor = 'pointer';
+      const porcentaje = ((p.dctoBase || 0) * 100).toFixed(2);
       card.innerHTML = `
         <button class="card-delete-btn" data-product-id="${p.id}" title="Eliminar producto">🗑️</button>
         <div class="product-image"><img src="${imgSrc}" onerror="this.src='${fallbackImg}'"></div>
@@ -728,7 +862,7 @@ onFirebaseReady(() => {
         <div class="product-presentation">${p.presentacion || ''}</div>
         <div class="product-prices">
           <div class="price-item"><div class="price-label">VVF</div><div class="price-value">S/${(p.vvf||0).toFixed(2)}</div></div>
-          <div class="price-item"><div class="price-label">Dcto. Base</div><div class="price-value">${(p.dctoBase||0)*100}%</div></div>
+          <div class="price-item"><div class="price-label">Dcto. Base</div><div class="price-value">${porcentaje}%</div></div>
           <div class="price-item"><div class="price-label">PVF</div><div class="price-value">S/${(p.pvf||0).toFixed(2)}</div></div>
           <div class="price-item"><div class="price-label">Vendidos</div><div class="price-value">${ventasByProd[p.id]||0}</div></div>
         </div>
@@ -762,9 +896,10 @@ onFirebaseReady(() => {
     } catch (err) { showToast('Error al eliminar producto: ' + err.message, 'error'); }
   }
 
-  // ─── AGREGAR CLIENTE ─────────────────────────────────
+  // ─── AGREGAR CLIENTE con RUC ──────────────────────────
   function openAddClientModal() {
     document.getElementById('newClientName').value = '';
+    document.getElementById('newClientRuc').value = '';
     document.getElementById('newClientContact').value = '';
     document.getElementById('newClientEmail').value = '';
     document.getElementById('newClientAddress').value = '';
@@ -776,6 +911,7 @@ onFirebaseReady(() => {
   async function addNewClient() {
     const nombre = document.getElementById('newClientName').value.trim();
     if (!nombre) { showToast('El nombre es obligatorio', 'error'); document.getElementById('addClientMessage').textContent = 'El nombre es obligatorio'; return; }
+    const ruc = document.getElementById('newClientRuc').value.trim();
     const contacto = document.getElementById('newClientContact').value.trim();
     const email = document.getElementById('newClientEmail').value.trim();
     const direccion = document.getElementById('newClientAddress').value.trim();
@@ -787,7 +923,7 @@ onFirebaseReady(() => {
     btn.disabled = true;
     try {
       const clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-      await db.collection('clientes').doc(clientId).set({ nombre, contacto: contacto || '', email: email || '', direccion: direccion || '', imagen: imagen || '' });
+      await db.collection('clientes').doc(clientId).set({ nombre, ruc: ruc || '', contacto: contacto || '', email: email || '', direccion: direccion || '', imagen: imagen || '' });
       const batch = db.batch();
       for (const prod of productsCache) {
         const precioBase = prod.pvf || 0;
@@ -818,7 +954,6 @@ onFirebaseReady(() => {
     document.getElementById('addProductMessage').textContent = '';
     document.getElementById('addProductModal').classList.remove('hidden');
 
-    // Listener para calcular PVF automáticamente
     const vvfInput = document.getElementById('newProductVVF');
     const dctoInput = document.getElementById('newProductDctoBase');
     const pvfInput = document.getElementById('newProductPVF');
@@ -883,7 +1018,6 @@ onFirebaseReady(() => {
     modal.dataset.productId = product.id;
     modal.classList.remove('hidden');
 
-    // Listeners para recalcular PVF en tiempo real
     const vvfInput = document.getElementById('productDetailVVF');
     const dctoInput = document.getElementById('productDetailDctoBase');
     const pvfInput = document.getElementById('productDetailPVF');
@@ -941,10 +1075,11 @@ onFirebaseReady(() => {
   });
   document.querySelector('#productDetailModal .modal-overlay')?.addEventListener('click', closeProductDetail);
 
-  // ─── DETALLES CLIENTE con toast (edición) ────────────
+  // ─── DETALLES CLIENTE con RUC y edición ──────────────
   function openClientDetail(client) {
     const modal = document.getElementById('clientDetailModal');
     document.getElementById('clientDetailName').value = client.nombre || '';
+    document.getElementById('clientDetailRuc').value = client.ruc || '';
     document.getElementById('clientDetailContact').value = client.contacto || '';
     document.getElementById('clientDetailEmail').value = client.email || '';
     document.getElementById('clientDetailAddress').value = client.direccion || '';
@@ -974,6 +1109,7 @@ onFirebaseReady(() => {
     const clientId = modal.dataset.clientId;
     if (!clientId) return;
     const nombre = document.getElementById('clientDetailName').value.trim();
+    const ruc = document.getElementById('clientDetailRuc').value.trim();
     const contacto = document.getElementById('clientDetailContact').value.trim();
     const email = document.getElementById('clientDetailEmail').value.trim();
     const direccion = document.getElementById('clientDetailAddress').value.trim();
@@ -983,11 +1119,11 @@ onFirebaseReady(() => {
     message.textContent = 'Guardando...'; message.style.color = 'var(--muted)';
     document.getElementById('saveClientDetailBtn').disabled = true;
     try {
-      const updateData = { nombre, contacto: contacto || '', email: email || '', direccion: direccion || '' };
+      const updateData = { nombre, ruc: ruc || '', contacto: contacto || '', email: email || '', direccion: direccion || '' };
       if (imagen) updateData.imagen = imagen;
       await db.collection('clientes').doc(clientId).update(updateData);
       const cliente = clientsCache.find(c => c.id === clientId);
-      if (cliente) { cliente.nombre = nombre; cliente.contacto = contacto || ''; cliente.email = email || ''; cliente.direccion = direccion || ''; if (imagen) cliente.imagen = imagen; }
+      if (cliente) { cliente.nombre = nombre; cliente.ruc = ruc || ''; cliente.contacto = contacto || ''; cliente.email = email || ''; cliente.direccion = direccion || ''; if (imagen) cliente.imagen = imagen; }
       message.textContent = '✓ Guardado'; message.style.color = 'var(--success)';
       showToast('Cliente actualizado correctamente', 'success');
       setTimeout(() => { closeClientDetail(); loadClients(); }, 1500);
@@ -1113,7 +1249,7 @@ onFirebaseReady(() => {
   cancelBtnUpload.addEventListener('click', closeUploadModal);
   document.querySelector('#uploadModal .modal-overlay')?.addEventListener('click', closeUploadModal);
 
-  // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS ───────
+  // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS (sin cambios) ───────
   async function showVentasDetalle() {
     const now = new Date();
     const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -1158,7 +1294,7 @@ onFirebaseReady(() => {
     }
     clientesActivos.sort((a,b) => b.ultima - a.ultima);
     const tbody = document.getElementById('clientesActivosTable');
-    if (clientesActivos.length === 0) tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td></tr>';
+    if (clientesActivos.length === 0) tbody.innerHTML = '<td><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td></tr>';
     else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
     document.getElementById('detailClientesActivosModal').classList.remove('hidden');
   }
@@ -1235,4 +1371,7 @@ onFirebaseReady(() => {
     img.onload = () => preview.classList.remove('hidden');
     img.onerror = () => preview.classList.add('hidden');
   });
+
+  // Evento para búsqueda en productos
+  document.getElementById('productSearchInput')?.addEventListener('input', () => loadProducts());
 });

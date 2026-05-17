@@ -140,7 +140,7 @@
           <div id="productTableContainer" style="margin-top: 20px; overflow-x: auto; width: 100%;">
             <table class="table" id="salesBatchTable" style="min-width: 1000px; width: 100%; white-space: nowrap;">
               <thead><tr><th>Imagen</th><th>Producto</th><th>Presentación</th><th>Precio (S/)</th><th>Cantidad</th><th>Lote</th><th>Vencimiento</th><th>Seleccionar</th></tr></thead>
-              <tbody id="batchTableBody"><tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td></tr></tbody>
+              <tbody id="batchTableBody"><tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr></tbody>
             </table>
           </div>
           <div class="form-actions" style="margin-top: 20px;">
@@ -150,11 +150,53 @@
         </div>
       </section>
 
-      <!-- HISTORIAL -->
+      <!-- HISTORIAL CON FILTROS AVANZADOS -->
       <section id="history" class="view hidden">
         <div class="table-card">
-          <div class="table-header"><h2 class="form-title">Historial de Ventas</h2><div class="filters"><input id="filterClient" class="filter-input" placeholder="🔍 Filtrar cliente…" /><input id="filterProduct" class="filter-input" placeholder="🔍 Filtrar producto…" /></div></div>
-          <div class="table-wrap"><table class="table" id="historyTable"><thead><tr><th>Cliente</th><th>Producto</th><th>Fecha venta</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th><th>Vencimiento</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
+          <div class="table-header">
+            <h2 class="form-title">Historial de Ventas</h2>
+            <button class="btn secondary" id="toggleFiltersBtn" style="padding: 6px 12px; font-size:12px;">🔍 Mostrar filtros</button>
+          </div>
+          <!-- Panel de filtros avanzados (colapsable) -->
+          <div id="advancedFilters" class="advanced-filters hidden">
+            <div class="filter-row">
+              <div class="filter-group">
+                <label>Fecha desde</label>
+                <input type="date" id="filterFechaDesde" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Fecha hasta</label>
+                <input type="date" id="filterFechaHasta" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Cliente</label>
+                <input type="text" id="filterCliente" class="filter-input" placeholder="Nombre o parte">
+              </div>
+              <div class="filter-group">
+                <label>Producto</label>
+                <input type="text" id="filterProducto" class="filter-input" placeholder="Nombre o parte">
+              </div>
+            </div>
+            <div class="filter-row">
+              <div class="filter-group">
+                <label>Lote</label>
+                <input type="text" id="filterLote" class="filter-input" placeholder="Número de lote">
+              </div>
+              <div class="filter-group">
+                <label>Vencimiento desde</label>
+                <input type="date" id="filterVenceDesde" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Vencimiento hasta</label>
+                <input type="date" id="filterVenceHasta" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <button id="applyFiltersBtn" class="btn primary" style="margin-top: 22px;">Aplicar filtros</button>
+                <button id="clearFiltersBtn" class="btn secondary" style="margin-top: 22px;">Limpiar</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="table" id="historyTable"><thead><tr><th>Cliente</th><th>Producto</th><th>Fecha venta</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th><th>Lote</th><th>Vencimiento</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
         </div>
       </section>
 
@@ -169,12 +211,13 @@
         </div>
       </section>
 
-      <!-- PRODUCTOS (con botón nuevo producto) -->
+      <!-- PRODUCTOS (con búsqueda y botón nuevo producto) -->
       <section id="products" class="view hidden">
         <div class="section-card">
           <div class="products-header">
             <h2 class="form-title">Productos</h2>
             <div style="display: flex; gap: 10px;">
+              <input type="text" id="productSearchInput" class="filter-input" placeholder="🔍 Buscar producto..." style="width: 200px;">
               <button id="uploadImagesBtn" class="btn primary" title="Subir imágenes a Firebase">📤 Subir Imágenes</button>
               <button id="addProductBtn" class="btn primary">➕ Nuevo Producto</button>
             </div>
@@ -183,13 +226,14 @@
         </div>
       </section>
 
-      <!-- MODAL AGREGAR CLIENTE -->
+      <!-- MODAL AGREGAR CLIENTE (con RUC) -->
       <div id="addClientModal" class="modal hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content" style="max-width: 600px;">
           <div class="modal-header"><h3>➕ Nuevo Cliente</h3><button class="modal-close" id="closeAddClientModal">&times;</button></div>
           <div class="modal-body">
             <label class="form-label">Nombre del Cliente <input type="text" id="newClientName" class="form-control" maxlength="100" placeholder="Ej: Farmacia Ejemplo" /></label>
+            <label class="form-label">RUC <input type="text" id="newClientRuc" class="form-control" maxlength="11" placeholder="Ej: 20123456789" /></label>
             <label class="form-label">Contacto / Teléfono <input type="text" id="newClientContact" class="form-control" placeholder="+51 999 123 456" /></label>
             <label class="form-label">Email <input type="email" id="newClientEmail" class="form-control" placeholder="cliente@ejemplo.com" /></label>
             <label class="form-label">Dirección <input type="text" id="newClientAddress" class="form-control" placeholder="Av. Principal 123" /></label>
@@ -224,7 +268,7 @@
       <!-- MODALES EXISTENTES (edición, imagen, etc.) -->
       <div id="uploadModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content"><div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div><div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div></div></div>
       <div id="productDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Producto</h3><button class="modal-close" id="closeDetailModal">&times;</button></div><div class="modal-body"><div id="productImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="productDetailImg" src="" alt="producto" /></div><label class="form-label">URL de la Imagen <input id="productDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="detailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="detailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Producto <input id="productDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">Presentación <input id="productDetailPresentation" type="text" maxlength="100" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label><label class="form-label">Detalle / Descripción <textarea id="productDetailDescription" class="form-control" rows="4" style="resize: vertical; font-family: inherit;"></textarea></label><div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;"><label class="form-label">VVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailVVF" /></label><label class="form-label">Dcto. Base (%) <input type="number" step="any" class="form-control" id="productDetailDctoBase" /></label><label class="form-label">PVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailPVF" /></label></div><span id="detailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelDetailBtn" class="btn secondary">Cancelar</button><button id="saveDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
-      <div id="clientDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div><div class="modal-body"><div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div><label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label><label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label><label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label><span id="clientDetailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
+      <div id="clientDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div><div class="modal-body"><div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div><label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">RUC <input type="text" id="clientDetailRuc" class="form-control" maxlength="11" placeholder="Ej: 20123456789" /></label><label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label><label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label><label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label><span id="clientDetailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
       <div id="saleDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Detalles de Venta</h3><button class="modal-close" id="closeSaleDetailModal">&times;</button></div><div class="modal-body"><div class="form-label"><strong>Cliente:</strong> <span id="saleDetailCliente">—</span></div><div class="form-label"><strong>Producto:</strong> <span id="saleDetailProducto">—</span></div><div class="form-label"><strong>Cantidad:</strong> <span id="saleDetailCantidad">—</span></div><div class="form-label"><strong>Precio Unitario:</strong> <span id="saleDetailPrecio">—</span></div><div class="form-label"><strong>Total:</strong> <span id="saleDetailTotal">—</span></div><div class="form-label"><strong>Fecha de Venta:</strong> <span id="saleDetailFecha">—</span></div><div class="form-label"><strong>Lote:</strong> <span id="saleDetailLote">—</span></div><div class="form-label"><strong>Fecha Vencimiento:</strong> <span id="saleDetailVencimiento">—</span></div></div><div class="modal-footer"><button id="closeSaleDetailBtn" class="btn secondary">Cerrar</button></div></div></div>
       <div id="editSaleModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Editar Venta</h3><button class="modal-close" id="closeEditSaleModal">&times;</button></div><div class="modal-body"><input type="hidden" id="editSaleId" /><label class="form-label">Cliente <select id="editClienteId" class="form-control"></select></label><label class="form-label">Producto <select id="editProductoId" class="form-control"></select></label><label class="form-label">Imagen del producto <div id="editProductImagePreview" class="image-preview" style="width: 80px; height: 80px; margin-top: 5px;"><img id="editProductImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label><label class="form-label">Cantidad <input type="number" step="1" min="1" id="editCantidad" class="form-control" /></label><label class="form-label">Lote <input type="text" maxlength="50" id="editLote" class="form-control" /></label><label class="form-label">Fecha Vencimiento <input type="date" id="editFechaVencimiento" class="form-control" /></label><label class="form-label">Precio Unitario (S/) <input type="number" step="0.01" min="0.01" id="editPrecioVenta" class="form-control" /></label><span id="editSaleMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelEditSaleBtn" class="btn secondary">Cancelar</button><button id="saveEditSaleBtn" class="btn primary">Guardar Cambios</button></div></div></div>
 

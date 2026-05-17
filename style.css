@@ -1289,3 +1289,65 @@ body {
     gap: 4px;
   }
 }
+
+/* Estilos para filtros avanzados en historial */
+.advanced-filters {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+.advanced-filters.hidden {
+  display: none;
+}
+.filter-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.filter-group {
+  flex: 1;
+  min-width: 140px;
+}
+.filter-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.filter-group .filter-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.filter-group .filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+#toggleFiltersBtn {
+  background: #e2e8f0;
+  color: #1e293b;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#toggleFiltersBtn:hover {
+  background: #cbd5e1;
+}
+/* Ajuste para columna Lote en tabla historial */
+#historyTable th:nth-child(7),
+#historyTable td:nth-child(7) {
+  min-width: 100px;
+}
+/* Estilo para RUC en tarjetas de cliente */
+.client-ruc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
