@@ -388,9 +388,17 @@ onFirebaseReady(() => {
     });
 
     const varHtml = varPct !== null ? `<span class="kpi-delta ${varPct >= 0 ? 'up' : 'down'}">${varPct >= 0 ? '▲' : '▼'} ${Math.abs(varPct).toFixed(1)}%</span>` : '';
-    document.getElementById('totalMonth').innerHTML = `S/${totalMes.toFixed(2)}<br>${varHtml}`;
-    document.getElementById('activeClients').textContent = activos;
-    document.getElementById('alertsCount').textContent = advertencias.length + urgentes.length;
+    
+    // Agregar validaciones para elementos que pueden no existir
+    const totalMonthEl = document.getElementById('totalMonth');
+    if (totalMonthEl) totalMonthEl.innerHTML = `S/${totalMes.toFixed(2)}<br>${varHtml}`;
+    
+    const activeClientsEl = document.getElementById('activeClients');
+    if (activeClientsEl) activeClientsEl.textContent = activos;
+    
+    const alertsCountEl = document.getElementById('alertsCount');
+    if (alertsCountEl) alertsCountEl.textContent = advertencias.length + urgentes.length;
+    
     const wList = document.getElementById('warningList'), dList = document.getElementById('dangerList');
     if (wList) wList.innerHTML = advertencias.length ? advertencias.map(a => `<li class="alert-item">⚠️ ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin advertencias</li>';
     if (dList) dList.innerHTML = urgentes.length ? urgentes.map(a => `<li class="alert-item">${a.tipo === 'vencido' ? '💀' : '🔴'} ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin alertas urgentes</li>';
