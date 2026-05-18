@@ -173,8 +173,15 @@ onFirebaseReady(() => {
     try {
       // 1️⃣ Cargar datos CRÍTICOS primero (ventas, clientes)
       const { ventas, clientes } = await progressiveLoader.loadCriticalData();
-      ventasCache = ventas;
-      clientsCache = clientes;
+      
+      // Si progressiveLoader retorna datos vacíos, usar refreshCache() como fallback
+      if (!ventas || ventas.length === 0) {
+        console.log('⚠️ progressiveLoader retornó datos vacíos, usando refreshCache()');
+        await refreshCache();
+      } else {
+        ventasCache = ventas;
+        clientsCache = clientes;
+      }
 
       console.log('✅ Datos críticos cargados:', { ventas: ventasCache.length, clientes: clientsCache.length });
 
