@@ -138,6 +138,28 @@ onFirebaseReady(() => {
     ventasCache   = vs.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
+  // ─── ESPERAR A CHART.JS ──────────────────────────────────
+  function waitForChart(maxWait = 5000) {
+    return new Promise((resolve) => {
+      if (typeof Chart !== 'undefined') {
+        resolve();
+        return;
+      }
+      const startTime = Date.now();
+      const checkInterval = setInterval(() => {
+        if (typeof Chart !== 'undefined') {
+          clearInterval(checkInterval);
+          resolve();
+        }
+        if (Date.now() - startTime > maxWait) {
+          clearInterval(checkInterval);
+          console.warn('⚠️ Chart.js timeout - renderizando sin Chart');
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
   // ─── CARGA PROGRESIVA OPTIMIZADA ──────────────────────────
   async function loadDataProgressive() {
     console.log('⚡ Iniciando carga progresiva...');
@@ -159,6 +181,9 @@ onFirebaseReady(() => {
       // Mostrar dashboard con datos críticos
       await loadQuotaMeta();
       loadProfile();
+      
+      // Esperar a que Chart.js esté disponible antes de renderizar gráficos
+      await waitForChart();
       loadDashboard();
 
       // Ocultar skeleton screens
@@ -474,6 +499,10 @@ onFirebaseReady(() => {
 
   let salesChartInstance = null;
   function renderSalesChart() {
+    if (typeof Chart === 'undefined') {
+      console.warn('⚠️ Chart.js no está disponible aún');
+      return;
+    }
     const ctx = document.getElementById('salesChart');
     if (!ctx) return;
     const context = ctx.getContext('2d');
@@ -505,6 +534,10 @@ onFirebaseReady(() => {
   let expandedTopClientsChartInstance = null;
   
   function renderTopClientsChart() {
+    if (typeof Chart === 'undefined') {
+      console.warn('⚠️ Chart.js no está disponible aún');
+      return;
+    }
     const canvas = document.getElementById('topClientsChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -605,6 +638,10 @@ onFirebaseReady(() => {
   }
 
   function renderQuotaChart() {
+    if (typeof Chart === 'undefined') {
+      console.warn('⚠️ Chart.js no está disponible aún');
+      return;
+    }
     const canvas = document.getElementById('quotaChart');
     if (!canvas) return;
 
