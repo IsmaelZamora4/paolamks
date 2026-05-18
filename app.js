@@ -17,6 +17,8 @@ onFirebaseReady(() => {
   let productsCache = [];
   let ventasCache   = [];
   let priceCache = {};
+  let quotaMeta = 0;
+  let quotaChartInstance = null;
 
   const fallbackImg = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" rx="18" fill="#f0f4f8"/><rect x="30" y="50" width="140" height="100" rx="10" fill="#dde3ec"/><circle cx="80" cy="85" r="18" fill="#b0bcc9"/><path d="M40 145 L75 105 L100 130 L125 110 L160 145Z" fill="#c8d2de"/><text x="100" y="175" text-anchor="middle" font-family="system-ui" font-size="13" fill="#8896a5">Sin imagen</text></svg>`);
 
@@ -117,6 +119,13 @@ onFirebaseReady(() => {
   }));
   updateExportFilteredButton();
 
+  // ─── NAVEGACIÓN A HISTORIAL DESDE VENTAS RECIENTES ──────
+  function navigateToHistory() {
+    // Encontrar el botón de historial
+    const historyBtn = Array.from(navBtns).find(b => b.dataset.view === 'history');
+    if (historyBtn) historyBtn.click();
+  }
+
   // ─── CACHÉ GLOBAL ────────────────────────────────────────
   async function refreshCache() {
     const [cs, ps, vs] = await Promise.all([
@@ -185,6 +194,7 @@ onFirebaseReady(() => {
   // ─── INICIO ───────────────────────────────────────────────
   (async () => {
     await refreshCache();
+    await loadQuotaMeta();
     loadProfile();
     loadDashboard();
   })();
@@ -307,6 +317,7 @@ onFirebaseReady(() => {
     renderRecentSales();
     renderSalesChart();
     renderTopClientsChart();
+    renderQuotaChart();
   }
 
   function renderProximasRecompras() {
@@ -343,19 +354,31 @@ onFirebaseReady(() => {
       return { id, nombre: prod?.nombre||id, presentacion: prod?.presentacion||'', imagen: prod?.imagen||fallbackImg, qty };
     });
     if (!top.length) { container.innerHTML = '<p class="muted" style="padding:12px;text-align:center">Sin ventas registradas.</p>'; return; }
-    container.innerHTML = top.map(p => `<div class="featured-item"><img src="${p.imagen}" onerror="this.src='${fallbackImg}'"><div class="meta"><div style="font-weight:600">${p.nombre}</div><div class="muted" style="font-size:12px">${p.presentacion}</div><div style="color:var(--accent);font-size:12px">Vendido: ${p.qty} unid.</div></div></div>`).join('');
+    container.innerHTML = top.map(p => `<div class="featured-item" data-product-id="${p.id}"><img src="${p.imagen}" onerror="this.src='${fallbackImg}'"><div class="meta"><div class="product-title-featured" style="font-weight:600;cursor:pointer">${p.nombre}</div><div class="muted" style="font-size:12px">${p.presentacion}</div><div style="color:var(--accent);font-size:12px">Vendido: ${p.qty} unid.</div></div></div>`).join('');
+    // Agregar listeners de click y hover
+    document.querySelectorAll('.product-title-featured').forEach(title => {
+      title.addEventListener('click', () => {
+        const productId = title.closest('.featured-item').dataset.productId;
+        const product = productsCache.find(p => p.id === productId);
+        if (product) viewFeaturedProductPreview(product);
+      });
+    });
   }
 
   async function renderRecentSales() {
     const container = document.getElementById('recentSales');
     if (!container) return;
-    const recent = ventasCache.filter(v=>v.fechaVenta).sort((a,b)=>toDateObj(b.fechaVenta)?.getTime() - toDateObj(a.fechaVenta)?.getTime()).slice(0,10);
+    const recent = ventasCache.filter(v=>v.fechaVenta).sort((a,b)=>toDateObj(b.fechaVenta)?.getTime() - toDateObj(a.fechaVenta)?.getTime()).slice(0,3);
     if (!recent.length) { container.innerHTML = '<li class="recent-sale" style="padding:12px;text-align:center"><span class="muted">Sin ventas registradas.</span></li>'; return; }
     const priceMap = await getMultiplePrices(recent);
     container.innerHTML = recent.map(v => {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-      return `<li class="recent-sale"><div><div style="font-weight:600">${productName(v.productoId)}</div><div class="muted" style="font-size:11px">${clientName(v.clienteId)} • ${fmtDate(v.fechaVenta)}</div></div><div style="color:var(--accent);font-weight:600">S/${(precio * (v.cantidad||0)).toFixed(2)}</div></li>`;
+      return `<li class="recent-sale" style="cursor:pointer;" title="Doble click para ver todas"><div><div style="font-weight:600">${productName(v.productoId)}</div><div class="muted" style="font-size:11px">${clientName(v.clienteId)} • ${fmtDate(v.fechaVenta)}</div></div><div style="color:var(--accent);font-weight:600">S/${(precio * (v.cantidad||0)).toFixed(2)}</div></li>`;
     }).join('');
+    // Agregar doble click a cada venta para navegar a Historial
+    container.querySelectorAll('.recent-sale').forEach(row => {
+      row.addEventListener('dblclick', navigateToHistory);
+    });
   }
 
   let salesChartInstance = null;
@@ -388,6 +411,8 @@ onFirebaseReady(() => {
   }
 
   let topClientsChartInstance = null;
+  let expandedTopClientsChartInstance = null;
+  
   function renderTopClientsChart() {
     const canvas = document.getElementById('topClientsChart');
     if (!canvas) return;
@@ -409,6 +434,220 @@ onFirebaseReady(() => {
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
     });
   }
+
+  // ─── ABRIR GRÁFICO EXPANDIDO ────────────────────────────────────────
+  function openTopClientsChart() {
+    const modal = document.getElementById('topClientsModal');
+    const canvas = document.getElementById('topClientsExpandedChart');
+    if (!canvas) return;
+    
+    // Renderizar gráfico en el canvas expandido
+    const ctx = canvas.getContext('2d');
+    const clientTotals = {};
+    ventasCache.forEach(v => {
+      const precio = priceCache[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+      const monto = precio * (v.cantidad || 0);
+      const nombre = clientName(v.clienteId);
+      clientTotals[nombre] = (clientTotals[nombre] || 0) + monto;
+    });
+    const sorted = Object.entries(clientTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const labels = sorted.map(item => item[0]);
+    const data = sorted.map(item => item[1]);
+    
+    if (expandedTopClientsChartInstance) expandedTopClientsChartInstance.destroy();
+    expandedTopClientsChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
+    });
+    modal.classList.remove('hidden');
+  }
+  
+  function closeTopClientsChart() { document.getElementById('topClientsModal').classList.add('hidden'); }
+  document.getElementById('topClientsSection')?.addEventListener('click', openTopClientsChart);
+  document.getElementById('closeTopClientsModal')?.addEventListener('click', closeTopClientsChart);
+  document.getElementById('closeTopClientsBtn')?.addEventListener('click', closeTopClientsChart);
+
+  // ─── CUOTA DEL MES ────────────────────────────────────────
+  async function loadQuotaMeta() {
+    try {
+      const doc = await db.collection('settings').doc('quotaMeta').get();
+      quotaMeta = doc.exists ? (doc.data().meta || 0) : 0;
+    } catch (err) {
+      console.error('Error cargando cuota:', err);
+      quotaMeta = 0;
+    }
+  }
+
+  async function saveQuotaMeta(newQuota) {
+    try {
+      await db.collection('settings').doc('quotaMeta').set({ meta: newQuota, updated: Date.now() }, { merge: true });
+      quotaMeta = newQuota;
+      renderQuotaChart();
+      cancelQuotaEdit();
+      showToast('✓ Cuota actualizada correctamente', 'success');
+    } catch (err) {
+      console.error('Error guardando cuota:', err);
+      showToast('Error al guardar la cuota: ' + err.message, 'error');
+    }
+  }
+
+  function editQuotaMeta() {
+    document.getElementById('quotaEditForm').style.display = 'block';
+    document.getElementById('quotaInput').value = quotaMeta || '';
+    document.getElementById('quotaInput').focus();
+  }
+
+  function cancelQuotaEdit() {
+    document.getElementById('quotaEditForm').style.display = 'none';
+    document.getElementById('quotaInput').value = '';
+  }
+
+  let expandedQuotaChartInstance = null;
+
+  function formatProgressPercent(progress) {
+    const rounded = Math.round(progress * 100) / 100;
+    let text = rounded.toFixed(2);
+    text = text.replace(/\.?0+$/, '');
+    if (!text.includes('.')) text += '.0';
+    return text;
+  }
+
+  function renderQuotaChart() {
+    const canvas = document.getElementById('quotaChart');
+    if (!canvas) return;
+
+    // Calcular ventas del mes actual
+    const now = new Date();
+    const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    let totalMes = 0;
+
+    ventasCache.forEach(v => {
+      if (v.mesCompra === mesKey) {
+        const precio = priceCache[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+        const monto = precio * (v.cantidad || 0);
+        totalMes += monto;
+      }
+    });
+
+    const progress = quotaMeta > 0 ? (totalMes / quotaMeta) * 100 : 0;
+    const progressText = formatProgressPercent(progress);
+
+    document.getElementById('quotaMetaValue').textContent = `S/${quotaMeta.toFixed(2)}`;
+    document.getElementById('quotaSalesValue').textContent = `S/${totalMes.toFixed(2)}`;
+    document.getElementById('quotaProgressValue').textContent = `${progressText}%`;
+
+    const ctx = canvas.getContext('2d');
+    const progressColor = progress >= 100 ? 'rgba(34, 197, 94, 1)' : progress >= 75 ? 'rgba(37, 99, 235, 1)' : progress >= 50 ? 'rgba(217, 119, 6, 1)' : 'rgba(220, 38, 38, 1)';
+    const remainingColor = 'rgba(200, 210, 222, 0.3)';
+
+    if (quotaChartInstance) quotaChartInstance.destroy();
+
+    quotaChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cumplido', 'Falta'],
+        datasets: [{
+          data: [Math.round(Math.min(progress, 100) * 100) / 100, Math.round(Math.max(0, 100 - progress) * 100) / 100],
+          backgroundColor: [progressColor, remainingColor],
+          borderColor: ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'],
+          borderWidth: 2,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatProgressPercent(ctx.parsed)}%` } }
+        }
+      }
+    });
+  }
+
+  function openQuotaChart() {
+    const modal = document.getElementById('quotaModal');
+    const canvas = document.getElementById('quotaExpandedChart');
+    if (!canvas) return;
+
+    // Calcular ventas del mes actual
+    const now = new Date();
+    const mesKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    let totalMes = 0;
+
+    ventasCache.forEach(v => {
+      if (v.mesCompra === mesKey) {
+        const precio = priceCache[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+        const monto = precio * (v.cantidad || 0);
+        totalMes += monto;
+      }
+    });
+
+    const progress = quotaMeta > 0 ? (totalMes / quotaMeta) * 100 : 0;
+    const remaining = quotaMeta - totalMes;
+    const remaining_safe = Math.max(remaining, 0);
+    const progressText = formatProgressPercent(progress);
+
+    document.getElementById('quotaModalMetaValue').textContent = quotaMeta.toFixed(2);
+    document.getElementById('quotaModalSalesValue').textContent = totalMes.toFixed(2);
+    document.getElementById('quotaModalProgressValue').textContent = `${progressText}%`;
+    document.getElementById('quotaModalMissingValue').textContent = remaining_safe.toFixed(2);
+
+    const ctx = canvas.getContext('2d');
+    const progressColor = progress >= 100 ? 'rgba(34, 197, 94, 1)' : progress >= 75 ? 'rgba(37, 99, 235, 1)' : progress >= 50 ? 'rgba(217, 119, 6, 1)' : 'rgba(220, 38, 38, 1)';
+    const remainingColor = 'rgba(200, 210, 222, 0.3)';
+
+    if (expandedQuotaChartInstance) expandedQuotaChartInstance.destroy();
+
+    expandedQuotaChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cumplido', 'Falta'],
+        datasets: [{
+          data: [Math.round(Math.min(progress, 100) * 100) / 100, Math.round(Math.max(0, 100 - progress) * 100) / 100],
+          backgroundColor: [progressColor, remainingColor],
+          borderColor: ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'],
+          borderWidth: 2,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 14 }, padding: 20, usePointStyle: true } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatProgressPercent(ctx.parsed)}%` } }
+        }
+      }
+    });
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeQuotaChart() { document.getElementById('quotaModal').classList.add('hidden'); }
+
+  document.getElementById('quotaChartSection')?.addEventListener('click', openQuotaChart);
+  document.getElementById('closeQuotaModal')?.addEventListener('click', closeQuotaChart);
+  document.getElementById('closeQuotaBtn')?.addEventListener('click', closeQuotaChart);
+
+  // Event listeners para cuota
+  document.getElementById('editQuotaBtn')?.addEventListener('click', editQuotaMeta);
+  document.getElementById('saveQuotaBtn')?.addEventListener('click', () => {
+    const newQuota = parseFloat(document.getElementById('quotaInput').value) || 0;
+    if (newQuota < 0) { showToast('La cuota debe ser un número positivo', 'warning'); return; }
+    saveQuotaMeta(newQuota);
+  });
+  document.getElementById('cancelQuotaBtn')?.addEventListener('click', cancelQuotaEdit);
+  document.getElementById('quotaInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const newQuota = parseFloat(document.getElementById('quotaInput').value) || 0;
+      if (newQuota < 0) { showToast('La cuota debe ser un número positivo', 'warning'); return; }
+      saveQuotaMeta(newQuota);
+    }
+  });
 
   // ─── REGISTRO MÚLTIPLE DE VENTAS con filtro ────────────────────────
   async function loadFormData() {
@@ -1301,6 +1540,23 @@ onFirebaseReady(() => {
   function closeProductDetail() { document.getElementById('productDetailModal').classList.add('hidden'); }
   document.getElementById('closeDetailModal')?.addEventListener('click', closeProductDetail);
   document.getElementById('cancelDetailBtn')?.addEventListener('click', closeProductDetail);
+  
+  // ─── VISTA PREVIA PRODUCTO DESTACADO ───
+  function viewFeaturedProductPreview(product) {
+    const modal = document.getElementById('featuredProductPreviewModal');
+    const imgSrc = (product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg;
+    document.getElementById('featuredPreviewImg').src = imgSrc;
+    document.getElementById('featuredPrevName').textContent = product.nombre || '–';
+    document.getElementById('featuredPrevPresentation').textContent = product.presentacion || '–';
+    document.getElementById('featuredPrevVVF').textContent = 'S/ ' + (product.vvf || 0).toFixed(2);
+    document.getElementById('featuredPrevDcto').textContent = ((product.dctoBase || 0) * 100).toFixed(2) + '%';
+    document.getElementById('featuredPrevPVF').textContent = 'S/ ' + (product.pvf || 0).toFixed(2);
+    modal.classList.remove('hidden');
+  }
+  function closeFeaturedProductPreview() { document.getElementById('featuredProductPreviewModal').classList.add('hidden'); }
+  document.getElementById('closeFeaturedPreviewModal')?.addEventListener('click', closeFeaturedProductPreview);
+  document.getElementById('closeFeaturedPreviewBtn')?.addEventListener('click', closeFeaturedProductPreview);
+  
   document.getElementById('productDetailImageUrl')?.addEventListener('change', () => {
     const url = document.getElementById('productDetailImageUrl').value.trim();
     const preview = document.getElementById('detailImagePreview');
@@ -1516,7 +1772,7 @@ onFirebaseReady(() => {
     } catch (err) { uploadMessage.textContent = 'Error: ' + err.message; uploadMessage.style.color = 'var(--danger)'; showToast('Error al guardar imagen: ' + err.message, 'error'); }
     confirmBtnUpload.disabled = false;
   });
-  uploadBtn.addEventListener('click', openUploadModal);
+  uploadBtn?.addEventListener('click', openUploadModal);
   closeModalBtn.addEventListener('click', closeUploadModal);
   cancelBtnUpload.addEventListener('click', closeUploadModal);
   document.querySelector('#uploadModal .modal-overlay')?.addEventListener('click', closeUploadModal);
