@@ -438,9 +438,17 @@ onFirebaseReady(() => {
     renderProximasRecompras();
     renderFeaturedProducts();
     renderRecentSales();
-    renderSalesChart();
-    renderTopClientsChart();
-    renderQuotaChart();
+    
+    // Agregar delay pequeño para asegurar que el DOM esté completamente renderizado
+    setTimeout(() => {
+      console.log('📈 Intentando renderizar gráficos después de delay...');
+      const salesChartEl = document.getElementById('salesChart');
+      console.log('Sales chart element encontrado?', !!salesChartEl);
+      
+      renderSalesChart();
+      renderTopClientsChart();
+      renderQuotaChart();
+    }, 100);
   }
 
   function renderProximasRecompras() {
