@@ -220,39 +220,107 @@ onFirebaseReady(() => {
   // ─── SKELETON SCREENS ────────────────────────────────────
   function showSkeletons() {
     const optimizer = window.PerformanceOptimizer;
-    
-    // Mostrar skeleton para KPIs
-    const kpiRow = document.querySelector('.kpi-row');
-    if (kpiRow) {
-      kpiRow.innerHTML = `
-        ${optimizer.createSkeletonKPI()}
-        ${optimizer.createSkeletonKPI()}
-        ${optimizer.createSkeletonKPI()}
-      `;
+
+    // 1. Skeletons para KPIs (sin perder los elementos con ID)
+    const kpiCards = document.querySelectorAll('.kpi-card');
+    kpiCards.forEach(card => {
+      // Guardar referencia al contenido original si no se ha guardado antes
+      if (!card._originalContent) {
+        card._originalContent = card.innerHTML;
+      }
+      // Mostrar skeleton overlay dentro de la tarjeta, pero sin borrar los elementos con ID
+      let skeletonOverlay = card.querySelector('.skeleton-overlay');
+      if (!skeletonOverlay) {
+        skeletonOverlay = document.createElement('div');
+        skeletonOverlay.className = 'skeleton-overlay';
+        skeletonOverlay.style.position = 'absolute';
+        skeletonOverlay.style.top = '0';
+        skeletonOverlay.style.left = '0';
+        skeletonOverlay.style.width = '100%';
+        skeletonOverlay.style.height = '100%';
+        skeletonOverlay.style.background = 'rgba(255,255,255,0.8)';
+        skeletonOverlay.style.borderRadius = 'var(--radius)';
+        skeletonOverlay.style.display = 'flex';
+        skeletonOverlay.style.flexDirection = 'column';
+        skeletonOverlay.style.gap = '12px';
+        skeletonOverlay.style.padding = '20px';
+        skeletonOverlay.style.zIndex = '5';
+        skeletonOverlay.innerHTML = `
+          <div style="background: linear-gradient(90deg, #e2e8f0 25%, #f0f4f8 50%, #e2e8f0 75%); 
+                      background-size: 200% 100%; animation: loading 1.5s infinite;
+                      height: 12px; border-radius: 4px;"></div>
+          <div style="background: linear-gradient(90deg, #dbeafe 25%, #e8f1ff 50%, #dbeafe 75%); 
+                      background-size: 200% 100%; animation: loading 1.5s infinite;
+                      height: 32px; border-radius: 6px;"></div>
+        `;
+        card.style.position = 'relative';
+        card.appendChild(skeletonOverlay);
+      } else {
+        skeletonOverlay.style.display = 'flex';
+      }
+    });
+
+    // 2. Skeleton para el gráfico (ocultar canvas y mostrar un div encima)
+    const chartCanvas = document.getElementById('salesChart');
+    if (chartCanvas && !chartCanvas._skeletonActive) {
+      const parent = chartCanvas.parentElement;
+      const skeletonDiv = document.createElement('div');
+      skeletonDiv.className = 'skeleton-chart';
+      skeletonDiv.style.width = '100%';
+      skeletonDiv.style.height = '250px';
+      skeletonDiv.style.background = 'linear-gradient(90deg, #f0f4f8 25%, #f8fafc 50%, #f0f4f8 75%)';
+      skeletonDiv.style.backgroundSize = '200% 100%';
+      skeletonDiv.style.animation = 'loading 1.5s infinite';
+      skeletonDiv.style.borderRadius = '12px';
+      chartCanvas.style.display = 'none';
+      parent.insertBefore(skeletonDiv, chartCanvas);
+      chartCanvas._skeletonDiv = skeletonDiv;
+      chartCanvas._skeletonActive = true;
     }
 
-    // Mostrar skeleton para gráfico
-    const chartContainer = document.querySelector('#salesChart')?.parentElement;
-    if (chartContainer) {
-      const parent = chartContainer.parentElement;
-      parent.innerHTML = `
-        <div class="section-card">
-          <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
-          ${optimizer.createSkeletonChart()}
-        </div>
-      `;
-    }
-
-    // Mostrar skeleton para recompras
-    const recomprasGrid = document.querySelector('#recomprasGrid');
+    // 3. Skeleton para recompras
+    const recomprasGrid = document.getElementById('recomprasGrid');
     if (recomprasGrid) {
+      if (!recomprasGrid._originalHTML) {
+        recomprasGrid._originalHTML = recomprasGrid.innerHTML;
+      }
       recomprasGrid.innerHTML = optimizer.createSkeletonCards(4);
     }
   }
 
   function hideSkeletons() {
-    // Los skeleton screens se reemplazan automáticamente cuando loadDashboard() renderiza
-    console.log('🎯 Dashboard renderizado');
+    // 1. Restaurar KPIs: eliminar los overlays skeleton
+    const kpiCards = document.querySelectorAll('.kpi-card');
+    kpiCards.forEach(card => {
+      const skeletonOverlay = card.querySelector('.skeleton-overlay');
+      if (skeletonOverlay) {
+        skeletonOverlay.style.display = 'none';
+      }
+      // Opcional: restaurar contenido original si se perdió (no debería)
+      if (card._originalContent && !card.querySelector('.kpi-value')) {
+        card.innerHTML = card._originalContent;
+      }
+    });
+
+    // 2. Restaurar gráfico
+    const chartCanvas = document.getElementById('salesChart');
+    if (chartCanvas && chartCanvas._skeletonActive) {
+      const skeletonDiv = chartCanvas._skeletonDiv;
+      if (skeletonDiv && skeletonDiv.parentElement) {
+        skeletonDiv.parentElement.removeChild(skeletonDiv);
+      }
+      chartCanvas.style.display = 'block';
+      chartCanvas._skeletonActive = false;
+      delete chartCanvas._skeletonDiv;
+    }
+
+    // 3. Restaurar recompras
+    const recomprasGrid = document.getElementById('recomprasGrid');
+    if (recomprasGrid && recomprasGrid._originalHTML) {
+      recomprasGrid.innerHTML = recomprasGrid._originalHTML;
+    }
+
+    console.log('🎯 Skeleton screens removidos, datos reales visibles');
   }
 
   async function getPrice(clienteId, productoId) {
@@ -435,60 +503,16 @@ onFirebaseReady(() => {
     if (wList) wList.innerHTML = advertencias.length ? advertencias.map(a => `<li class="alert-item">⚠️ ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin advertencias</li>';
     if (dList) dList.innerHTML = urgentes.length ? urgentes.map(a => `<li class="alert-item">${a.tipo === 'vencido' ? '💀' : '🔴'} ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin alertas urgentes</li>';
 
-    // 🔧 RECREAR LA SECCIÓN DE GRÁFICOS que fue reemplazada por skeleton
-    const dashboardMain = document.querySelector('.dashboard-main');
-    if (dashboardMain) {
-      let chartSection = null;
-      const allSections = dashboardMain.querySelectorAll('.section-card');
-      
-      for (let section of allSections) {
-        const title = section.querySelector('.section-title');
-        if (title && title.textContent.includes('Tendencia de ventas')) {
-          chartSection = section;
-          break;
-        }
-      }
-      
-      // Si no existe la sección, crear toda la sección desde cero
-      if (!chartSection) {
-        const firstSection = dashboardMain.querySelector('.section-card');
-        if (firstSection && firstSection.parentElement) {
-          const container = document.createElement('div');
-          container.className = 'section-card';
-          container.innerHTML = `
-            <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
-            <canvas id="salesChart" style="max-height: 250px; width: 100%;"></canvas>
-          `;
-          firstSection.parentElement.insertBefore(container, firstSection.nextSibling);
-        }
-      } else if (!document.getElementById('salesChart')) {
-        // Si la sección existe pero no tiene canvas, agregarlo
-        const header = chartSection.querySelector('.section-header');
-        if (header) {
-          const canvas = document.createElement('canvas');
-          canvas.id = 'salesChart';
-          canvas.style.height = '250px';
-          canvas.style.width = '100%';
-          canvas.style.maxHeight = 'none';
-          chartSection.appendChild(canvas);
-        }
-      }
-    }
-
     renderProximasRecompras();
     renderFeaturedProducts();
     renderRecentSales();
     
-    // Agregar delay pequeño para asegurar que el DOM esté completamente renderizado
+    // Renderizar gráficos con un pequeño delay para asegurar que el DOM esté listo
     setTimeout(() => {
-      console.log('📈 Intentando renderizar gráficos después de delay...');
-      const salesChartEl = document.getElementById('salesChart');
-      console.log('Sales chart element encontrado?', !!salesChartEl);
-      
       renderSalesChart();
       renderTopClientsChart();
       renderQuotaChart();
-    }, 100);
+    }, 50);
   }
 
   function renderProximasRecompras() {
@@ -553,21 +577,32 @@ onFirebaseReady(() => {
   }
 
   let salesChartInstance = null;
+  let expandedSalesChartInstance = null;
+  let chartRenderInProgress = false;
+  
   function renderSalesChart() {
+    if (chartRenderInProgress) return;
+    chartRenderInProgress = true;
+
     console.log('📈 renderSalesChart() llamado');
-    console.log('Chart disponible?', typeof Chart !== 'undefined');
-    console.log('ventasCache items:', ventasCache.length);
     
     if (typeof Chart === 'undefined') {
       console.warn('⚠️ Chart.js no está disponible aún');
+      chartRenderInProgress = false;
       return;
     }
     
     const ctx = document.getElementById('salesChart');
     if (!ctx) {
       console.warn('⚠️ Canvas #salesChart no encontrado');
+      chartRenderInProgress = false;
       return;
     }
+
+    // 🔧 Asegurar que el canvas tenga dimensiones estables
+    ctx.style.display = 'block';
+    ctx.style.height = '250px';
+    ctx.style.width = '100%';
     
     const context = ctx.getContext('2d');
     const salesByMonth = {};
@@ -581,24 +616,99 @@ onFirebaseReady(() => {
       const monto = precio * (v.cantidad || 0);
       salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + monto;
     });
+
+    // Generar etiquetas para los últimos 6 meses
+    const labels = [];
+    const data = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('es-PE', { month: 'short', year: 'numeric' });
+      labels.push(label);
+      data.push(salesByMonth[monthKey] || 0);
+    }
+
+    if (salesChartInstance) {
+      // Si ya existe, actualizar datos en lugar de destruir
+      salesChartInstance.data.labels = labels;
+      salesChartInstance.data.datasets[0].data = data;
+      salesChartInstance.update();
+    } else {
+      // Crear nuevo gráfico
+      salesChartInstance = new Chart(context, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Ventas (S/)', data, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1, borderRadius: 8 }] },
+        options: { 
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, 
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } 
+        }
+      });
+    }
+
+    if (ctx) {
+      ctx.style.cursor = 'pointer';
+      ctx.removeEventListener('click', openSalesChartModal);
+      ctx.addEventListener('click', openSalesChartModal);
+    }
     
-    console.log('salesByMonth:', salesByMonth);
-    const sortedMonths = Object.keys(salesByMonth).sort();
-    const labels = sortedMonths.map(m => {
-      const [year, month] = m.split('-');
-      return new Date(year, month-1).toLocaleDateString('es-PE', { month:'short', year:'numeric' });
+    console.log('✅ Gráfico de ventas renderizado/actualizado');
+    chartRenderInProgress = false;
+  }
+
+  function openSalesChartModal() {
+    const modal = document.getElementById('salesChartModal');
+    const canvas = document.getElementById('salesChartExpanded');
+    if (!canvas || !modal) return;
+
+    const salesByMonth = {};
+    ventasCache.forEach(v => {
+      if (!v.fechaVenta) return;
+      const date = toDateObj(v.fechaVenta);
+      if (!date) return;
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}`;
+      const precio = priceCache[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
+      const monto = precio * (v.cantidad || 0);
+      salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + monto;
     });
-    const data = sortedMonths.map(m => salesByMonth[m]);
-    
-    console.log('Gráfico labels:', labels, 'data:', data);
-    
-    if (salesChartInstance) salesChartInstance.destroy();
-    salesChartInstance = new Chart(context, {
+
+    const labels = [];
+    const data = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('es-PE', { month: 'short', year: 'numeric' });
+      labels.push(label);
+      data.push(salesByMonth[monthKey] || 0);
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (expandedSalesChartInstance) expandedSalesChartInstance.destroy();
+
+    expandedSalesChartInstance = new Chart(ctx, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Ventas (S/)', data, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1, borderRadius: 8 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } }
+      }
     });
-    console.log('✅ Gráfico de ventas renderizado');
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeSalesChartModal() {
+    const modal = document.getElementById('salesChartModal');
+    if (modal) modal.classList.add('hidden');
+    if (expandedSalesChartInstance) {
+      expandedSalesChartInstance.destroy();
+      expandedSalesChartInstance = null;
+    }
   }
 
   let topClientsChartInstance = null;
@@ -611,6 +721,12 @@ onFirebaseReady(() => {
     }
     const canvas = document.getElementById('topClientsChart');
     if (!canvas) return;
+    
+    // 🔧 Asegurar que el canvas tenga dimensiones antes de renderizar
+    canvas.style.display = 'block';
+    canvas.style.height = '250px';
+    canvas.style.width = '100%';
+    
     const ctx = canvas.getContext('2d');
     const clientTotals = {};
     ventasCache.forEach(v => {
@@ -622,12 +738,26 @@ onFirebaseReady(() => {
     const sorted = Object.entries(clientTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const labels = sorted.map(item => item[0]);
     const data = sorted.map(item => item[1]);
-    if (topClientsChartInstance) topClientsChartInstance.destroy();
-    topClientsChartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
-    });
+    
+    if (topClientsChartInstance) {
+      // Actualizar datos en lugar de destruir
+      topClientsChartInstance.data.labels = labels;
+      topClientsChartInstance.data.datasets[0].data = data;
+      topClientsChartInstance.update();
+    } else {
+      // Crear nuevo gráfico
+      topClientsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
+        options: { 
+          indexAxis: 'y', 
+          responsive: true, 
+          maintainAspectRatio: true, 
+          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, 
+          scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } 
+        }
+      });
+    }
   }
 
   // ─── ABRIR GRÁFICO EXPANDIDO ────────────────────────────────────────
