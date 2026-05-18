@@ -9,8 +9,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Farmacéuticos Markos" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <meta name="format-detection" content="telephone=no" />
-  <title>Farmacéuticos Markos — Panel Paola</title>
+  <title>MKS DashBoard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
@@ -32,8 +33,8 @@
     <aside class="sidebar">
       <div class="brand-wrap">
         <div class="brand-text">
-          <span class="brand-name">Farmacéuticos</span>
-          <span class="brand-markos">Markos</span>
+          <span class="brand-name">MKS</span>
+          <span class="brand-markos">DashBoard</span>
         </div>
       </div>
       <nav>
@@ -94,7 +95,7 @@
               <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
               <canvas id="salesChart" style="max-height: 250px; width: 100%;"></canvas>
             </div>
-            <div class="section-card"><div class="section-header"><div class="section-title">🔄 Próximas recompras estimadas</div></div><div id="recomprasGrid" class="recompras-grid"></div></div>
+            <div class="section-card" id="topClientsSection" style="cursor: pointer; transition: all 0.3s ease;"><div class="section-header"><div class="section-title">🏆 Top 5 clientes (ventas totales)</div></div><canvas id="topClientsChart" style="max-height: 280px; width: 100%;"></canvas></div>
           </div>
           <aside class="dashboard-side">
             <div class="section-card quota-card" style="margin-bottom: 20px;">
@@ -132,9 +133,9 @@
                 </div>
               </div>
             </div>
-            <div class="section-card"><div class="section-header"><div class="section-title">⭐ Productos destacados</div></div><div id="featuredProducts" class="featured-list"></div></div>
+            <div class="section-card"><div class="section-header"><div class="section-title">⭐ Top 3 productos destacados</div></div><div id="featuredProducts" class="featured-list"></div></div>
             <div class="section-card"><div class="section-header"><div class="section-title">🕘 Ventas recientes</div></div><ul id="recentSales" class="recent-sales-list"></ul></div>
-            <div class="section-card" id="topClientsSection" style="cursor: pointer; transition: all 0.3s ease;"><div class="section-header"><div class="section-title">🏆 Top 5 clientes (ventas totales)</div></div><canvas id="topClientsChart" style="max-height: 280px; width: 100%;"></canvas></div>
+            <div class="section-card" id="recomprasSection" style="cursor: pointer;"><div class="section-header"><div class="section-title">🔄 Próximas recompras estimadas</div></div><div id="recomprasGrid" class="recompras-grid"></div></div>
             <div class="section-card"><div id="clockWidget" class="clock-widget"><div class="clock-header" id="clockLocation">Detectando ubicación...</div><div class="clock-display" id="clockDisplay">--:--:--</div><div class="clock-date" id="clockDate">--</div></div></div>
           </aside>
         </div>
@@ -313,6 +314,14 @@
       <div id="topClientsModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>🏆 Top 5 clientes (ventas totales)</h3><button class="modal-close" id="closeTopClientsModal">&times;</button></div><div class="modal-body"><canvas id="topClientsExpandedChart" style="max-height: 500px; width: 100%;"></canvas></div><div class="modal-footer"><button id="closeTopClientsBtn" class="btn primary">Cerrar</button></div></div></div>
       <div id="quotaModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>📊 Meta del mes - Vista Detallada</h3><button class="modal-close" id="closeQuotaModal">&times;</button></div><div class="modal-body"><div style="display: flex; gap: 20px; align-items: flex-start;"><div style="flex: 1; min-height: 400px;"><canvas id="quotaExpandedChart" style="max-height: 400px; width: 100%;"></canvas></div><div style="display: flex; flex-direction: column; gap: 16px; min-width: 200px;"><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Meta establecida</div><div class="quota-stat-value">S/<span id="quotaModalMetaValue">0.00</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Ventas realizadas</div><div class="quota-stat-value">S/<span id="quotaModalSalesValue">0.00</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Progreso</div><div class="quota-stat-value quota-progress-text"><span id="quotaModalProgressValue">0%</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Falta por vender</div><div class="quota-stat-value">S/<span id="quotaModalMissingValue">0.00</span></div></div></div></div></div><div class="modal-footer"><button id="closeQuotaBtn" class="btn primary">Cerrar</button></div></div></div>
       <div id="salesChartModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>📈 Tendencia de ventas - Vista detallada</h3><button class="modal-close" id="closeSalesChartModal">&times;</button></div><div class="modal-body"><canvas id="salesChartExpanded" style="max-height: 500px; width: 100%;"></canvas></div><div class="modal-footer"><button id="closeSalesChartBtn" class="btn primary">Cerrar</button></div></div></div>
+      <div id="recomprasModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+          <div class="modal-header"><h3>📅 Listado de Recompras Estimadas</h3><button class="modal-close" id="closeRecomprasModal">&times;</button></div>
+          <div class="modal-body"><div id="recomprasFullGrid" class="recompras-grid" style="display: grid; gap: 10px;"></div></div>
+          <div class="modal-footer"><button id="closeRecomprasBtn" class="btn primary">Cerrar</button></div>
+        </div>
+      </div>
     </main>
   </div>
   <footer class="animated-footer">

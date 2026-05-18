@@ -515,8 +515,8 @@ onFirebaseReady(() => {
     }, 50);
   }
 
-  function renderProximasRecompras() {
-    const container = document.getElementById('recomprasGrid');
+  function renderProximasRecompras(limit = null, containerId = 'recomprasGrid') {
+    const container = document.getElementById(containerId);
     if (!container) return;
     const clientIntervals = {};
     clientsCache.forEach(c => {
@@ -531,20 +531,33 @@ onFirebaseReady(() => {
       if (daysUntil <= 14) clientIntervals[c.id] = { nombre: c.nombre, daysUntil, nextDate: new Date(nextBuyEstimate) };
     });
     const sorted = Object.values(clientIntervals).sort((a,b)=>a.daysUntil-b.daysUntil);
-    if (!sorted.length) { container.innerHTML = '<p class="muted" style="padding:12px">Se necesitan más ventas registradas para estimar recompras.</p>'; return; }
-    container.innerHTML = sorted.map(r => {
+    
+    const listToDisplay = limit ? sorted.slice(0, limit) : sorted;
+
+    if (!sorted.length) { 
+      container.innerHTML = '<p class="muted" style="padding:12px">Sin recompras estimadas.</p>'; 
+      return; 
+    }
+
+    container.innerHTML = listToDisplay.map(r => {
       const urgencia = r.daysUntil <= 0 ? 'danger' : r.daysUntil <= 7 ? 'warn' : 'ok';
       const label = r.daysUntil <= 0 ? `Debería haber comprado hace ${Math.abs(r.daysUntil)} días` : r.daysUntil === 0 ? 'Hoy' : `En ${r.daysUntil} días (${fmtDate(r.nextDate)})`;
       return `<div class="recompra-card ${urgencia}"><div class="recompra-nombre">${r.nombre}</div><div class="recompra-fecha">${label}</div></div>`;
     }).join('');
   }
 
+  function openRecomprasModal() {
+    renderProximasRecompras(null, 'recomprasFullGrid');
+    document.getElementById('recomprasModal').classList.remove('hidden');
+  }
+  function closeRecomprasModal() { document.getElementById('recomprasModal').classList.add('hidden'); }
+
   function renderFeaturedProducts() {
     const container = document.getElementById('featuredProducts');
     if (!container) return;
     const prodCount = {};
     ventasCache.forEach(v => { prodCount[v.productoId] = (prodCount[v.productoId] || 0) + (v.cantidad || 0); });
-    const top = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,qty]) => {
+    const top = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id,qty]) => {
       const prod = productsCache.find(p=>p.id===id);
       return { id, nombre: prod?.nombre||id, presentacion: prod?.presentacion||'', imagen: prod?.imagen||fallbackImg, qty };
     });
@@ -702,6 +715,12 @@ onFirebaseReady(() => {
     modal.classList.remove('hidden');
   }
 
+  // Listeners para Recompras
+  document.getElementById('recomprasSection')?.addEventListener('click', openRecomprasModal);
+  document.getElementById('closeRecomprasModal')?.addEventListener('click', closeRecomprasModal);
+  document.getElementById('closeRecomprasBtn')?.addEventListener('click', closeRecomprasModal);
+  document.querySelector('#recomprasModal .modal-overlay')?.addEventListener('click', closeRecomprasModal);
+
   function closeSalesChartModal() {
     const modal = document.getElementById('salesChartModal');
     if (modal) modal.classList.add('hidden');
@@ -710,6 +729,11 @@ onFirebaseReady(() => {
       expandedSalesChartInstance = null;
     }
   }
+
+  // Listeners para cerrar el modal de tendencia de ventas
+  document.getElementById('closeSalesChartModal')?.addEventListener('click', closeSalesChartModal);
+  document.getElementById('closeSalesChartBtn')?.addEventListener('click', closeSalesChartModal);
+  document.querySelector('#salesChartModal .modal-overlay')?.addEventListener('click', closeSalesChartModal);
 
   let topClientsChartInstance = null;
   let expandedTopClientsChartInstance = null;
@@ -792,6 +816,7 @@ onFirebaseReady(() => {
   document.getElementById('topClientsSection')?.addEventListener('click', openTopClientsChart);
   document.getElementById('closeTopClientsModal')?.addEventListener('click', closeTopClientsChart);
   document.getElementById('closeTopClientsBtn')?.addEventListener('click', closeTopClientsChart);
+  document.querySelector('#topClientsModal .modal-overlay')?.addEventListener('click', closeTopClientsChart);
 
   // ─── CUOTA DEL MES ────────────────────────────────────────
   async function loadQuotaMeta() {
@@ -961,6 +986,7 @@ onFirebaseReady(() => {
   document.getElementById('quotaChartSection')?.addEventListener('click', openQuotaChart);
   document.getElementById('closeQuotaModal')?.addEventListener('click', closeQuotaChart);
   document.getElementById('closeQuotaBtn')?.addEventListener('click', closeQuotaChart);
+  document.querySelector('#quotaModal .modal-overlay')?.addEventListener('click', closeQuotaChart);
 
   // Event listeners para cuota
   document.getElementById('editQuotaBtn')?.addEventListener('click', editQuotaMeta);
@@ -1925,7 +1951,21 @@ async function registerBatchSales() {
   function closeFeaturedProductPreview() { document.getElementById('featuredProductPreviewModal').classList.add('hidden'); }
   document.getElementById('closeFeaturedPreviewModal')?.addEventListener('click', closeFeaturedProductPreview);
   document.getElementById('closeFeaturedPreviewBtn')?.addEventListener('click', closeFeaturedProductPreview);
+  document.querySelector('#featuredProductPreviewModal .modal-overlay')?.addEventListener('click', closeFeaturedProductPreview);
   
+  // ─── CIERRE GLOBAL DE MODALES (ESCAPE) ──────────────────
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeFeaturedProductPreview();
+      closeRecomprasModal();
+      if (typeof closeSalesChartModal === 'function') closeSalesChartModal();
+      if (typeof closeTopClientsChart === 'function') closeTopClientsChart();
+      if (typeof closeQuotaChart === 'function') closeQuotaChart();
+      // Cerrar cualquier modal genérico que use la clase .modal
+      document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+    }
+  });
+
   document.getElementById('productDetailImageUrl')?.addEventListener('change', () => {
     const url = document.getElementById('productDetailImageUrl').value.trim();
     const preview = document.getElementById('detailImagePreview');
