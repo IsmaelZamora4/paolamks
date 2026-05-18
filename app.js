@@ -499,14 +499,24 @@ onFirebaseReady(() => {
 
   let salesChartInstance = null;
   function renderSalesChart() {
+    console.log('📈 renderSalesChart() llamado');
+    console.log('Chart disponible?', typeof Chart !== 'undefined');
+    console.log('ventasCache items:', ventasCache.length);
+    
     if (typeof Chart === 'undefined') {
       console.warn('⚠️ Chart.js no está disponible aún');
       return;
     }
+    
     const ctx = document.getElementById('salesChart');
-    if (!ctx) return;
+    if (!ctx) {
+      console.warn('⚠️ Canvas #salesChart no encontrado');
+      return;
+    }
+    
     const context = ctx.getContext('2d');
     const salesByMonth = {};
+    
     ventasCache.forEach(v => {
       if (!v.fechaVenta) return;
       const date = toDateObj(v.fechaVenta);
@@ -516,18 +526,24 @@ onFirebaseReady(() => {
       const monto = precio * (v.cantidad || 0);
       salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + monto;
     });
+    
+    console.log('salesByMonth:', salesByMonth);
     const sortedMonths = Object.keys(salesByMonth).sort();
     const labels = sortedMonths.map(m => {
       const [year, month] = m.split('-');
       return new Date(year, month-1).toLocaleDateString('es-PE', { month:'short', year:'numeric' });
     });
     const data = sortedMonths.map(m => salesByMonth[m]);
+    
+    console.log('Gráfico labels:', labels, 'data:', data);
+    
     if (salesChartInstance) salesChartInstance.destroy();
     salesChartInstance = new Chart(context, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Ventas (S/)', data, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1, borderRadius: 8 }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } }
     });
+    console.log('✅ Gráfico de ventas renderizado');
   }
 
   let topClientsChartInstance = null;
