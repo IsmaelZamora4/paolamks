@@ -435,6 +435,45 @@ onFirebaseReady(() => {
     if (wList) wList.innerHTML = advertencias.length ? advertencias.map(a => `<li class="alert-item">⚠️ ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin advertencias</li>';
     if (dList) dList.innerHTML = urgentes.length ? urgentes.map(a => `<li class="alert-item">${a.tipo === 'vencido' ? '💀' : '🔴'} ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin alertas urgentes</li>';
 
+    // 🔧 RECREAR LA SECCIÓN DE GRÁFICOS que fue reemplazada por skeleton
+    const dashboardMain = document.querySelector('.dashboard-main');
+    if (dashboardMain) {
+      let chartSection = null;
+      const allSections = dashboardMain.querySelectorAll('.section-card');
+      
+      for (let section of allSections) {
+        const title = section.querySelector('.section-title');
+        if (title && title.textContent.includes('Tendencia de ventas')) {
+          chartSection = section;
+          break;
+        }
+      }
+      
+      // Si no existe la sección, crear toda la sección desde cero
+      if (!chartSection) {
+        const firstSection = dashboardMain.querySelector('.section-card');
+        if (firstSection && firstSection.parentElement) {
+          const container = document.createElement('div');
+          container.className = 'section-card';
+          container.innerHTML = `
+            <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
+            <canvas id="salesChart" style="max-height: 250px; width: 100%;"></canvas>
+          `;
+          firstSection.parentElement.insertBefore(container, firstSection.nextSibling);
+        }
+      } else if (!document.getElementById('salesChart')) {
+        // Si la sección existe pero no tiene canvas, agregarlo
+        const header = chartSection.querySelector('.section-header');
+        if (header) {
+          const canvas = document.createElement('canvas');
+          canvas.id = 'salesChart';
+          canvas.style.maxHeight = '250px';
+          canvas.style.width = '100%';
+          chartSection.appendChild(canvas);
+        }
+      }
+    }
+
     renderProximasRecompras();
     renderFeaturedProducts();
     renderRecentSales();
