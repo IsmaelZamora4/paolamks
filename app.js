@@ -799,78 +799,118 @@ onFirebaseReady(() => {
     filterProductTable();
   }
 
-  async function registerBatchSales() {
-    const clienteId = window.clientSelect ? window.clientSelect.value : document.getElementById('clientSelect').value;
-    if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
-    const rows = document.querySelectorAll('#batchTableBody tr');
-    const ventasParaGuardar = [];
-    const precioBatch = db.batch();
-    let precioOps = 0;
-
+async function registerBatchSales() {
+  const clienteId = window.clientSelect ? window.clientSelect.value : document.getElementById('clientSelect').value;
+  if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
+  const rows = document.querySelectorAll('#batchTableBody tr');
+  const ventasParaGuardar = [];
+  
+  // Primero recopilamos los datos para validar todo antes de iniciar el batch
+  for (const row of rows) {
+    const productoId = row.dataset.productoId;
+    const toggleBtn = row.querySelector('.btn-toggle');
+    if (!toggleBtn || !toggleBtn.classList.contains('active')) continue;
+    
+    const cantidadInput = row.querySelector('.batch-cantidad');
+    const cantidad = parseInt(cantidadInput.value);
+    if (isNaN(cantidad) || cantidad <= 0) { showToast(`La cantidad para ${productoId} debe ser un número positivo`, 'error'); return; }
+    
+    const lote = row.querySelector('.batch-lote').value.trim();
+    if (!lote) { showToast(`El lote es obligatorio para ${productoId}`, 'error'); return; }
+    
+    const vencimiento = row.querySelector('.batch-vencimiento').value;
+    if (!vencimiento) { showToast(`La fecha de vencimiento es obligatoria para ${productoId}`, 'error'); return; }
+    
+    const precioInput = row.querySelector('.price-input');
+    const precio = parseFloat(precioInput.value);
+    if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
+    
+    const now = new Date();
+    const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    ventasParaGuardar.push({
+      clienteId, productoId, cantidad, lote,
+      fechaVencimiento: new Date(vencimiento),
+      fechaVenta: now,
+      mesCompra,
+      precioVenta: precio
+    });
+  }
+  
+  if (ventasParaGuardar.length === 0) { showToast('Activa al menos un producto con cantidad > 0', 'warning'); return; }
+  
+  // Crear un solo batch para todas las operaciones
+  const batch = db.batch();
+  
+  for (const venta of ventasParaGuardar) {
+    // 1. Preparar referencia del documento de precio (usando el ID compuesto o uno nuevo)
+    let priceDocId = null;
+    // Buscar la fila correspondiente para obtener el priceDocId actual (si existe)
     for (const row of rows) {
-      const productoId = row.dataset.productoId;
-      const toggleBtn = row.querySelector('.btn-toggle');
-      if (!toggleBtn || !toggleBtn.classList.contains('active')) continue;
-      
-      const cantidadInput = row.querySelector('.batch-cantidad');
-      const cantidad = parseInt(cantidadInput.value);
-      if (isNaN(cantidad) || cantidad <= 0) { showToast(`La cantidad para ${productoId} debe ser un número positivo`, 'error'); return; }
-      
-      const lote = row.querySelector('.batch-lote').value.trim();
-      if (!lote) { showToast(`El lote es obligatorio para ${productoId}`, 'error'); return; }
-      
-      const vencimiento = row.querySelector('.batch-vencimiento').value;
-      if (!vencimiento) { showToast(`La fecha de vencimiento es obligatoria para ${productoId}`, 'error'); return; }
-      
-      const precioInput = row.querySelector('.price-input');
-      const precio = parseFloat(precioInput.value);
-      if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
-      
-      const now = new Date();
-      const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
-      ventasParaGuardar.push({ clienteId, productoId, cantidad, lote, fechaVencimiento: new Date(vencimiento), fechaVenta: now, mesCompra, precioVenta: precio });
-      
-      let priceDocId = row.dataset.priceDocId;
-      if (!priceDocId) {
-        const newDocRef = db.collection('precios').doc();
-        priceDocId = newDocRef.id;
-        row.dataset.priceDocId = priceDocId;
+      if (row.dataset.productoId === venta.productoId) {
+        priceDocId = row.dataset.priceDocId;
+        break;
       }
-      precioBatch.set(db.collection('precios').doc(priceDocId), { clienteId, productoId, precio });
-      precioOps++;
+    }
+    if (!priceDocId) {
+      // Si no existe, crear nuevo ID (Firestore lo generará automáticamente)
+      const newPriceRef = db.collection('precios').doc();
+      priceDocId = newPriceRef.id;
+      // Actualizar el atributo data-price-doc-id en la fila para futuras referencias (opcional)
+      const targetRow = Array.from(rows).find(r => r.dataset.productoId === venta.productoId);
+      if (targetRow) targetRow.dataset.priceDocId = priceDocId;
+    }
+    const priceRef = db.collection('precios').doc(priceDocId);
+    batch.set(priceRef, {
+      clienteId: venta.clienteId,
+      productoId: venta.productoId,
+      precio: venta.precioVenta
+    });
+    
+    // 2. Registrar la venta (Firestore asigna ID automáticamente)
+    const ventaRef = db.collection('ventas').doc();
+    batch.set(ventaRef, {
+      clienteId: venta.clienteId,
+      productoId: venta.productoId,
+      cantidad: venta.cantidad,
+      lote: venta.lote,
+      fechaVencimiento: venta.fechaVencimiento,
+      fechaVenta: venta.fechaVenta,
+      mesCompra: venta.mesCompra,
+      precioVenta: venta.precioVenta
+    });
+  }
+  
+  const btn = document.getElementById('registerBatchBtn');
+  btn.disabled = true;
+  
+  try {
+    await batch.commit();
+    
+    // Actualizar cachés locales
+    for (const venta of ventasParaGuardar) {
+      ventasCache.push({ id: Date.now() + Math.random(), ...venta });
+      const key = `${venta.clienteId}_${venta.productoId}`;
+      priceCache[key] = venta.precioVenta;
     }
     
-    if (ventasParaGuardar.length === 0) { showToast('Activa al menos un producto con cantidad > 0', 'warning'); return; }
+    showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
     
-    const ventasBatch = db.batch();
-    for (const venta of ventasParaGuardar) { ventasBatch.set(db.collection('ventas').doc(), venta); }
+    // Limpiar formulario
+    document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
+    document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
+    document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
+    document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
     
-    const btn = document.getElementById('registerBatchBtn');
-    btn.disabled = true;
-    
-    try {
-      if (precioOps > 0) await precioBatch.commit();
-      await ventasBatch.commit();
-      
-      for (const venta of ventasParaGuardar) ventasCache.push({ id: Date.now() + Math.random(), ...venta });
-      for (const venta of ventasParaGuardar) {
-        const key = `${venta.clienteId}_${venta.productoId}`;
-        priceCache[key] = venta.precioVenta;
-      }
-      showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
-      
-      document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
-      document.querySelectorAll('.btn-toggle').forEach(btn => { btn.classList.remove('active'); btn.textContent = '🔘 Inactivo'; });
-      document.querySelectorAll('.batch-lote').forEach(inp => inp.value = '');
-      document.querySelectorAll('.batch-vencimiento').forEach(inp => inp.value = '');
-      
-      await refreshCache();
-      await loadProductTableForClient(clienteId);
-      loadDashboard();
-    } catch (err) { showToast('Error: ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    await refreshCache();
+    await loadProductTableForClient(clienteId);
+    loadDashboard();
+  } catch (err) {
+    console.error(err);
+    showToast('Error al registrar ventas: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
   }
-  document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
+}
 
   // ─── HISTORIAL CON FILTROS AVANZADOS Y AGRUPACIÓN POR CLIENTE ──
   let currentFilters = {
