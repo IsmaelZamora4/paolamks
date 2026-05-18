@@ -467,8 +467,9 @@ onFirebaseReady(() => {
         if (header) {
           const canvas = document.createElement('canvas');
           canvas.id = 'salesChart';
-          canvas.style.maxHeight = '250px';
+          canvas.style.height = '250px';
           canvas.style.width = '100%';
+          canvas.style.maxHeight = 'none';
           chartSection.appendChild(canvas);
         }
       }
@@ -595,7 +596,7 @@ onFirebaseReady(() => {
     salesChartInstance = new Chart(context, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Ventas (S/)', data, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1, borderRadius: 8 }] },
-      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } }
     });
     console.log('✅ Gráfico de ventas renderizado');
   }
@@ -625,7 +626,7 @@ onFirebaseReady(() => {
     topClientsChartInstance = new Chart(ctx, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
     });
   }
 
