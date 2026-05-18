@@ -138,6 +138,91 @@ onFirebaseReady(() => {
     ventasCache   = vs.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
+  // ─── CARGA PROGRESIVA OPTIMIZADA ──────────────────────────
+  async function loadDataProgressive() {
+    console.log('⚡ Iniciando carga progresiva...');
+    
+    // Mostrar skeleton screens inmediatamente
+    showSkeletons();
+
+    const optimizer = window.PerformanceOptimizer;
+    const progressiveLoader = await optimizer.loadDataProgressive(db);
+
+    try {
+      // 1️⃣ Cargar datos CRÍTICOS primero (ventas, clientes)
+      const { ventas, clientes } = await progressiveLoader.loadCriticalData();
+      ventasCache = ventas;
+      clientsCache = clientes;
+
+      console.log('✅ Datos críticos cargados:', { ventas: ventasCache.length, clientes: clientsCache.length });
+
+      // Mostrar dashboard con datos críticos
+      await loadQuotaMeta();
+      loadProfile();
+      loadDashboard();
+
+      // Ocultar skeleton screens
+      hideSkeletons();
+
+      // 2️⃣ Cargar datos secundarios en BACKGROUND (no bloquea UI)
+      setTimeout(async () => {
+        console.log('🔄 Cargando datos secundarios en background...');
+        const productos = await progressiveLoader.loadSecondaryData();
+        if (productos && productos.length > 0) {
+          productsCache = productos;
+          console.log('✅ Productos cargados en background:', productsCache.length);
+        }
+      }, 100);
+
+    } catch (err) {
+      console.error('Error en carga progresiva:', err);
+      hideSkeletons();
+      // Intentar cargar del caché como fallback
+      await refreshCache();
+      await loadQuotaMeta();
+      loadProfile();
+      loadDashboard();
+    }
+  }
+
+  // ─── SKELETON SCREENS ────────────────────────────────────
+  function showSkeletons() {
+    const optimizer = window.PerformanceOptimizer;
+    
+    // Mostrar skeleton para KPIs
+    const kpiRow = document.querySelector('.kpi-row');
+    if (kpiRow) {
+      kpiRow.innerHTML = `
+        ${optimizer.createSkeletonKPI()}
+        ${optimizer.createSkeletonKPI()}
+        ${optimizer.createSkeletonKPI()}
+      `;
+    }
+
+    // Mostrar skeleton para gráfico
+    const chartContainer = document.querySelector('#salesChart')?.parentElement;
+    if (chartContainer) {
+      const parent = chartContainer.parentElement;
+      parent.innerHTML = `
+        <div class="section-card">
+          <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
+          ${optimizer.createSkeletonChart()}
+        </div>
+      `;
+    }
+
+    // Mostrar skeleton para recompras
+    const recomprasGrid = document.querySelector('#recomprasGrid');
+    if (recomprasGrid) {
+      recomprasGrid.innerHTML = optimizer.createSkeletonCards(4);
+    }
+  }
+
+  function hideSkeletons() {
+    // Los skeleton screens se reemplazan automáticamente cuando loadDashboard() renderiza
+    console.log('🎯 Dashboard renderizado');
+  }
+
   async function getPrice(clienteId, productoId) {
     const key = `${clienteId}_${productoId}`;
     if (priceCache.hasOwnProperty(key)) return priceCache[key];
@@ -193,10 +278,8 @@ onFirebaseReady(() => {
 
   // ─── INICIO ───────────────────────────────────────────────
   (async () => {
-    await refreshCache();
-    await loadQuotaMeta();
-    loadProfile();
-    loadDashboard();
+    // Usar carga progresiva en lugar de refreshCache
+    await loadDataProgressive();
   })();
 
   // ─── PERFIL ───────────────────────────────────────────────
