@@ -413,6 +413,11 @@ onFirebaseReady(() => {
     return new Date(val);
   }
 
+  function fmtMoney(val) {
+    if (typeof val !== 'number') val = parseFloat(val) || 0;
+    return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function fmtDate(val) {
     const d = toDateObj(val);
     if (!d) return '—';
@@ -674,7 +679,7 @@ onFirebaseReady(() => {
     
     // Agregar validaciones para elementos que pueden no existir
     const totalMonthEl = document.getElementById('totalMonth');
-    if (totalMonthEl) totalMonthEl.innerHTML = `S/${totalMes.toFixed(2)}<br>${varHtml}`;
+    if (totalMonthEl) totalMonthEl.innerHTML = `S/${fmtMoney(totalMes)}<br>${varHtml}`;
     
     const activeClientsEl = document.getElementById('activeClients');
     if (activeClientsEl) activeClientsEl.textContent = activos;
@@ -764,7 +769,7 @@ onFirebaseReady(() => {
     const priceMap = await getMultiplePrices(recent);
     container.innerHTML = recent.map(v => {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-      return `<li class="recent-sale" style="cursor:pointer;" title="Doble click para ver todas"><div><div style="font-weight:600">${productName(v.productoId)}</div><div class="muted" style="font-size:11px">${clientName(v.clienteId)} • ${fmtDate(v.fechaVenta)}</div></div><div style="color:var(--accent);font-weight:600">S/${(precio * (v.cantidad||0)).toFixed(2)}</div></li>`;
+      return `<li class="recent-sale" style="cursor:pointer;" title="Doble click para ver todas"><div><div style="font-weight:600">${productName(v.productoId)}</div><div class="muted" style="font-size:11px">${clientName(v.clienteId)} • ${fmtDate(v.fechaVenta)}</div></div><div style="color:var(--accent);font-weight:600">S/${fmtMoney(precio * (v.cantidad||0))}</div></li>`;
     }).join('');
     // Agregar doble click a cada venta para navegar a Historial
     container.querySelectorAll('.recent-sale').forEach(row => {
@@ -838,7 +843,7 @@ onFirebaseReady(() => {
         options: { 
           responsive: true,
           maintainAspectRatio: true,
-          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, 
+          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${fmtMoney(ctx.raw)}` } } }, 
           scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } } 
         }
       });
@@ -890,7 +895,7 @@ onFirebaseReady(() => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } },
+        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${fmtMoney(ctx.raw)}` } } },
         scales: { y: { beginAtZero: true, title: { display: true, text: 'Monto (S/)' } }, x: { title: { display: true, text: 'Mes' } } }
       }
     });
@@ -960,7 +965,7 @@ onFirebaseReady(() => {
           indexAxis: 'y', 
           responsive: true, 
           maintainAspectRatio: true, 
-          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, 
+          plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${fmtMoney(ctx.raw)}` } } }, 
           scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } 
         }
       });
@@ -990,7 +995,7 @@ onFirebaseReady(() => {
     expandedTopClientsChartInstance = new Chart(ctx, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Ventas totales (S/)', data, backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `S/ ${fmtMoney(ctx.raw)}` } } }, scales: { x: { title: { display: true, text: 'Monto (S/)' }, beginAtZero: true }, y: { title: { display: true, text: 'Cliente' } } } }
     });
     modal.classList.remove('hidden');
   }
@@ -1074,8 +1079,8 @@ onFirebaseReady(() => {
     const progress = quotaMeta > 0 ? (totalMes / quotaMeta) * 100 : 0;
     const progressText = formatProgressPercent(progress);
 
-    document.getElementById('quotaMetaValue').textContent = `S/${quotaMeta.toFixed(2)}`;
-    document.getElementById('quotaSalesValue').textContent = `S/${totalMes.toFixed(2)}`;
+    document.getElementById('quotaMetaValue').textContent = `S/${fmtMoney(quotaMeta)}`;
+    document.getElementById('quotaSalesValue').textContent = `S/${fmtMoney(totalMes)}`;
     document.getElementById('quotaProgressValue').textContent = `${progressText}%`;
 
     const ctx = canvas.getContext('2d');
@@ -1127,7 +1132,7 @@ onFirebaseReady(() => {
           },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: S/${ctx.parsed.x.toFixed(2)}` } }
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: S/${fmtMoney(ctx.parsed.x)}` } }
           }
         }
       });
@@ -1157,10 +1162,10 @@ onFirebaseReady(() => {
     const remaining_safe = Math.max(remaining, 0);
     const progressText = formatProgressPercent(progress);
 
-    document.getElementById('quotaModalMetaValue').textContent = quotaMeta.toFixed(2);
-    document.getElementById('quotaModalSalesValue').textContent = totalMes.toFixed(2);
+    document.getElementById('quotaModalMetaValue').textContent = fmtMoney(quotaMeta);
+    document.getElementById('quotaModalSalesValue').textContent = fmtMoney(totalMes);
     document.getElementById('quotaModalProgressValue').textContent = `${progressText}%`;
-    document.getElementById('quotaModalMissingValue').textContent = remaining_safe.toFixed(2);
+    document.getElementById('quotaModalMissingValue').textContent = fmtMoney(remaining_safe);
 
     const ctx = canvas.getContext('2d');
     const progressColor = progress >= 100 ? 'rgba(34, 197, 94, 1)' : progress >= 75 ? 'rgba(37, 99, 235, 1)' : progress >= 50 ? 'rgba(217, 119, 6, 1)' : 'rgba(220, 38, 38, 1)';
@@ -1288,7 +1293,11 @@ onFirebaseReady(() => {
     const tbody = document.getElementById('batchTableBody');
     tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
     
-    const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clienteId).get();
+    const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
+    const preciosSnapshot = await db.collection('precios')
+      .where('userId', '==', uid)
+      .where('clienteId', '==', clienteId)
+      .get();
     const preciosMap = new Map();
     preciosSnapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -1367,7 +1376,7 @@ onFirebaseReady(() => {
           }
           const key = `${clienteId}_${productId}`;
           priceCache[key] = newPrice;
-          showToast(`Precio base actualizado a S/ ${newPrice.toFixed(2)}`, 'success');
+          showToast(`Precio base actualizado a S/ ${fmtMoney(newPrice)}`, 'success');
         } catch (err) {
           showToast('Error al actualizar precio: ' + err.message, 'error');
         }
@@ -1613,7 +1622,7 @@ async function registerBatchSales() {
       // Filas de ventas de este cliente
       for (const v of ventasCliente) {
         const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
-        const total = (precio * (v.cantidad||0)).toFixed(2);
+        const total = fmtMoney(precio * (v.cantidad||0));
         const dias = daysDiff(v.fechaVencimiento);
         let vencClass = '', vencText = fmtDate(v.fechaVencimiento);
         if (dias !== null) {
@@ -1628,7 +1637,7 @@ async function registerBatchSales() {
           <td>${productName(v.productoId)}</td>
           <td>${fmtDate(v.fechaVenta)}</td>
           <td>${v.cantidad}</td>
-          <td>S/${precio.toFixed(2)}</td>
+          <td>S/${fmtMoney(precio)}</td>
           <td>S/${total}</td>
           <td>${v.lote || '—'}</td>
           <td class="${vencClass}">${vencText}</td>
@@ -1739,7 +1748,7 @@ async function registerBatchSales() {
       }
       const dashboardSheet = [{
         'Reporte generado': now.toLocaleString('es-PE'),
-        'Ventas del mes (S/)': totalMes.toFixed(2),
+        'Ventas del mes (S/)': fmtMoney(totalMes),
         'Clientes activos (30d)': document.getElementById('activeClients')?.innerText || '0',
         'Alertas activas': document.getElementById('alertsCount')?.innerText || '0',
         'Total clientes': clientsCache.length,
@@ -1831,7 +1840,7 @@ async function registerBatchSales() {
     document.getElementById('saleDetailCliente').textContent = clientName(venta.clienteId);
     document.getElementById('saleDetailProducto').textContent = productName(venta.productoId);
     document.getElementById('saleDetailCantidad').textContent = venta.cantidad || '—';
-    document.getElementById('saleDetailPrecio').textContent = `S/${precio.toFixed(2)}`;
+    document.getElementById('saleDetailPrecio').textContent = `S/${fmtMoney(precio)}`;
     document.getElementById('saleDetailTotal').textContent = `S/${total}`;
     document.getElementById('saleDetailFecha').textContent = fmtDate(venta.fechaVenta);
     document.getElementById('saleDetailLote').textContent = venta.lote || '—';
@@ -1926,7 +1935,7 @@ async function registerBatchSales() {
         <div class="client-stats">
           <div><span class="stat-label">Última compra</span><span class="stat-val">${lastTs ? fmtDate({ seconds: lastTs/1000 }) : '—'}</span></div>
           <div><span class="stat-label">Total compras</span><span class="stat-val">${totalCompras}</span></div>
-          <div><span class="stat-label">Monto total</span><span class="stat-val">S/${totalMonto.toFixed(2)}</span></div>
+          <div><span class="stat-label">Monto total</span><span class="stat-val">S/${fmtMoney(totalMonto)}</span></div>
         </div>
         ${topProdHtml ? `<div class="client-tags"><span class="muted" style="font-size:.8rem">Productos frecuentes:</span><br>${topProdHtml}</div>` : ''}
       `;
@@ -1944,8 +1953,9 @@ async function registerBatchSales() {
     try {
       const client = clientsCache.find(c => c.id === clientId);
       if (!client) throw new Error('Cliente no encontrado');
-      const preciosSnapshot = await db.collection('precios').where('clienteId', '==', clientId).get();
-      const ventasSnapshot = await db.collection('ventas').where('clienteId', '==', clientId).get();
+      const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
+      const preciosSnapshot = await db.collection('precios').where('userId', '==', uid).where('clienteId', '==', clientId).get();
+      const ventasSnapshot = await db.collection('ventas').where('userId', '==', uid).where('clienteId', '==', clientId).get();
       const batch = db.batch();
       preciosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
       ventasSnapshot.docs.forEach(doc => batch.delete(doc.ref));
@@ -1984,9 +1994,9 @@ async function registerBatchSales() {
         <div class="product-name">${p.nombre}</div>
         <div class="product-presentation">${p.presentacion || ''}</div>
         <div class="product-prices">
-          <div class="price-item"><div class="price-label">VVF</div><div class="price-value">S/${(p.vvf||0).toFixed(2)}</div></div>
+          <div class="price-item"><div class="price-label">VVF</div><div class="price-value">S/${fmtMoney(p.vvf||0)}</div></div>
           <div class="price-item"><div class="price-label">Dcto. Base</div><div class="price-value">${porcentaje}%</div></div>
-          <div class="price-item"><div class="price-label">PVF</div><div class="price-value">S/${(p.pvf||0).toFixed(2)}</div></div>
+          <div class="price-item"><div class="price-label">PVF</div><div class="price-value">S/${fmtMoney(p.pvf||0)}</div></div>
           <div class="price-item"><div class="price-label">Vendidos</div><div class="price-value">${ventasByProd[p.id]||0}</div></div>
         </div>
       `;
@@ -2166,9 +2176,9 @@ async function registerBatchSales() {
     document.getElementById('featuredPreviewImg').src = imgSrc;
     document.getElementById('featuredPrevName').textContent = product.nombre || '–';
     document.getElementById('featuredPrevPresentation').textContent = product.presentacion || '–';
-    document.getElementById('featuredPrevVVF').textContent = 'S/ ' + (product.vvf || 0).toFixed(2);
+    document.getElementById('featuredPrevVVF').textContent = 'S/ ' + fmtMoney(product.vvf || 0);
     document.getElementById('featuredPrevDcto').textContent = ((product.dctoBase || 0) * 100).toFixed(2) + '%';
-    document.getElementById('featuredPrevPVF').textContent = 'S/ ' + (product.pvf || 0).toFixed(2);
+    document.getElementById('featuredPrevPVF').textContent = 'S/ ' + fmtMoney(product.pvf || 0);
     modal.classList.remove('hidden');
   }
   function closeFeaturedProductPreview() { document.getElementById('featuredProductPreviewModal').classList.add('hidden'); }
@@ -2429,10 +2439,10 @@ async function registerBatchSales() {
       const precio = priceMap[`${v.clienteId}_${v.productoId}`] ?? v.precioVenta ?? 0;
       const total = precio * (v.cantidad || 0);
       totalGeneral += total;
-      html += `<tr><td>${clientName(v.clienteId)}</td><td>${productName(v.productoId)}</td><td>${v.cantidad}</td><td>S/${precio.toFixed(2)}</td><td>S/${total.toFixed(2)}</td><td>${fmtDate(v.fechaVenta)}</td></tr>`;
+      html += `<tr><td>${clientName(v.clienteId)}</td><td>${productName(v.productoId)}</td><td>${v.cantidad}</td><td>S/${fmtMoney(precio)}</td><td>S/${fmtMoney(total)}</td><td>${fmtDate(v.fechaVenta)}</td></tr>`;
     }
     document.getElementById('ventasDetalleTable').innerHTML = html;
-    document.getElementById('ventasTotalGeneral').textContent = `S/${totalGeneral.toFixed(2)}`;
+    document.getElementById('ventasTotalGeneral').textContent = `S/${fmtMoney(totalGeneral)}`;
     document.getElementById('ventasCount').textContent = ventasMes.length;
     document.getElementById('detailVentasModal').classList.remove('hidden');
   }
@@ -2455,7 +2465,7 @@ async function registerBatchSales() {
     clientesActivos.sort((a,b) => b.ultima - a.ultima);
     const tbody = document.getElementById('clientesActivosTable');
     if (clientesActivos.length === 0) tbody.innerHTML = '<td><td colspan="4" class="muted" style="text-align:center;">No hay clientes activos en los últimos 30 días</td</tr>';
-    else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${c.totalMonto.toFixed(2)}</td></tr>`).join('');
+    else tbody.innerHTML = clientesActivos.map(c => `<tr><td>${c.nombre}</td><td>${fmtDate(c.ultima)}</td><td>${c.totalCompras}</td><td>S/${fmtMoney(c.totalMonto)}</td></tr>`).join('');
     document.getElementById('detailClientesActivosModal').classList.remove('hidden');
   }
   function showAlertasDetalle() {
