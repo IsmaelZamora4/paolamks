@@ -1111,7 +1111,16 @@ body.dark-mode .kpi-card.warn-card {
 .price-label { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; }
 .price-value { font-weight: 700; color: var(--accent); font-size: 14px; }
 
-/* ── IMPORTAR ──────────────────────────────────────── */
+/* Ajuste para que las imágenes en los modales no se vean con zoom */
+#productDetailImg, #featuredPreviewImg {
+  width: 100%;
+  height: auto;
+  background-color: var(--bg);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+/* ─── IMPORTACIÓN ──────────────────────────────────── */
 .import-progress {
   margin: 16px 0;
   padding: 14px;
@@ -1397,10 +1406,12 @@ body.dark-mode .kpi-card.warn-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 12px 20px; /* Padding más compacto */
   border-bottom: 1px solid var(--border);
 }
+
 .modal-header h3 { margin: 0; font-size: 18px; font-weight: 600; }
+
 .modal-close {
   background: none;
   border: none;
@@ -1415,6 +1426,7 @@ body.dark-mode .kpi-card.warn-card {
   justify-content: center;
   transition: all .2s ease;
 }
+
 .modal-close:hover {
   color: var(--text);
   background: var(--bg);
@@ -1422,18 +1434,30 @@ body.dark-mode .kpi-card.warn-card {
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 12px 20px; /* Reducido de 20px */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 
 .modal-footer {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  padding: 16px 20px;
+  padding: 12px 20px; /* Padding más compacto */
   border-top: 1px solid var(--border);
+}
+
+/* Ajustes específicos para el modal de detalles para evitar scroll */
+#productDetailModal .form-control {
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+#productDetailModal textarea#productDetailDescription {
+  height: 60px;
+  min-height: 60px;
+  resize: vertical;
 }
 
 /* ── FILE INPUT ─────────────────────────────────────── */

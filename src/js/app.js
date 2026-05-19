@@ -2018,8 +2018,9 @@ async function registerBatchSales() {
     try {
       const product = productsCache.find(p => p.id === productId);
       if (!product) throw new Error('Producto no encontrado');
-      const preciosSnapshot = await db.collection('precios').where('productoId', '==', productId).get();
-      const ventasSnapshot = await db.collection('ventas').where('productoId', '==', productId).get();
+      const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
+      const preciosSnapshot = await db.collection('precios').where('userId', '==', uid).where('productoId', '==', productId).get();
+      const ventasSnapshot = await db.collection('ventas').where('userId', '==', uid).where('productoId', '==', productId).get();
       const batch = db.batch();
       preciosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
       ventasSnapshot.docs.forEach(doc => batch.delete(doc.ref));
