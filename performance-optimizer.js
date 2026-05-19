@@ -173,12 +173,22 @@
         // Si no hay caché, cargar del Firebase (en paralelo pero ligero)
         console.log('🔄 Cargando datos críticos desde Firebase...');
         try {
+          const user = window.currentUser || firebase.auth().currentUser;
+          const uid = user ? user.uid : null;
+          
+          if (!uid) {
+            console.warn('⚠️ No hay usuario logueado, usando caché');
+            return { ventas: cachedVentas, clientes: cachedClientes };
+          }
+
           const [ventasSnap, clientesSnap] = await Promise.all([
             firebaseDB.collection('ventas')
+              .where('userId', '==', uid)
               .orderBy('fecha', 'desc')
               .limit(500)
               .get(),
             firebaseDB.collection('clientes')
+              .where('userId', '==', uid)
               .limit(200)
               .get()
           ]);
@@ -206,10 +216,20 @@
         console.log('📦 Cargando datos secundarios en background...');
         
         try {
+          const user = window.currentUser || firebase.auth().currentUser;
+          const uid = user ? user.uid : null;
+          
+          if (!uid) {
+            console.warn('⚠️ No hay usuario para cargar secundarios');
+            return await getFromCache('productos');
+          }
+
           const shouldRefresh = await shouldRefreshCache('productos', 10 * 60 * 1000);
           
           if (shouldRefresh) {
-            const productosSnap = await firebaseDB.collection('productos').get();
+            const productosSnap = await firebaseDB.collection('productos')
+              .where('userId', '==', uid)
+              .get();
             const productos = productosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
             
             await saveToCache('productos', productos);

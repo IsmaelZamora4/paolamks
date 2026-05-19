@@ -28,9 +28,10 @@ window.db = db;
 window.storage = storage;
 window.auth = auth;
 
-auth.signInAnonymously().catch(err => {
-  console.warn('Auth anónima falló (continuando de todas formas):', err.message);
-});
+// ❌ DESHABILITADA: Auth anónima no debe usarse con auth.js
+// auth.signInAnonymously().catch(err => {
+//   console.warn('Auth anónima falló (continuando de todas formas):', err.message);
+// });
 
 window.dispatchEvent(new CustomEvent('firebase-ready'));
 console.log('%cCONECTADO A FIREBASE REAL CON PERSISTENCIA', 'color: blue; font-weight: bold;');

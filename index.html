@@ -23,16 +23,100 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
   <script defer src="firebase.js"></script>
   <script defer src="performance-optimizer.js"></script>
+  <script defer src="js/auth.js"></script>
   <script defer src="firestore-optimizations.js"></script>
   <script defer src="app.js"></script>
   <script defer src="mobile-optimizations.js"></script>
 </head>
 <body>
-  <div class="app">
+  <!-- Pantalla de Carga -->
+  <div id="splashScreen" class="splash-screen">
+    <div class="spinner"></div>
+    <img src="assets/mks.png" alt="MKS" class="splash-logo">
+  </div>
+
+  <!-- Sección de Autenticación -->
+  <section id="authView" class="view">
+    <div class="auth-split-wrapper">
+      <!-- Lado Izquierdo: Branding y Frase Pro -->
+      <div class="auth-branding-side">
+        <div class="branding-content">
+          <div class="animated-logo-container">
+            <img src="assets/mks.png" alt="MKS Logo" class="premium-logo">
+            <div class="logo-glow"></div>
+          </div>
+          <h1 class="branding-title">Gestiona tu negocio <br><span>en tiempo real.</span></h1>
+          <p class="branding-subtitle">La plataforma inteligente para el control de Farmacéuticos Markos.</p>
+          <div class="branding-graphic">
+            <div class="mockup-dashboard">
+              <div class="mockup-line"></div>
+              <div class="mockup-line short"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lado Derecho: Formulario Refinado -->
+      <div class="auth-form-side">
+        <div class="auth-card-premium">
+          <h2 id="authTitle">Bienvenido</h2>
+          <p class="auth-card-subtitle">Ingresa tus credenciales para continuar</p>
+          
+          <form id="loginForm">
+            <!-- Campos de registro optimizados -->
+            <div id="registerExtraFields" class="hidden registration-grid">
+              <div class="input-group-premium"><input type="text" id="regNombre"><label>Nombre</label></div>
+              <div class="input-group-premium"><input type="text" id="regApellido"><label>Apellido</label></div>
+              <div class="input-group-premium full"><input type="date" id="regBirth"><label>Fecha de Nacimiento</label></div>
+              <div class="input-group-premium"><input type="tel" id="regTel"><label>Celular</label></div>
+              <div class="input-group-premium"><input type="text" id="regDni" maxlength="8"><label>DNI</label></div>
+            </div>
+
+            <div class="input-group-premium">
+              <input type="email" id="authEmail" required>
+              <label>Correo electrónico</label>
+            </div>
+            
+            <div class="input-group-premium">
+              <input type="password" id="authPassword" required>
+              <label>Contraseña</label>
+            </div>
+            
+            <div class="auth-options">
+              <label class="show-pass-label">
+                <input type="checkbox" id="showPassToggle">
+                <span>Mostrar contraseña</span>
+              </label>
+            </div>
+
+            <button type="submit" id="btnAuthMain" class="btn-premium primary-gradient">
+              <span class="btn-text">Entrar al Panel</span>
+              <div class="btn-loader hidden"></div>
+            </button>
+          </form>
+
+          <div class="auth-separator">
+            <span>o continúa con</span>
+          </div>
+
+          <button id="btnGoogleAuth" class="btn-premium google-white">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
+            Google
+          </button>
+
+          <p class="auth-switch">
+            ¿No tienes cuenta? <a href="#" id="switchToRegister">Regístrate ahora</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="appView" class="app hidden">
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand-wrap">
-        <img src="mks.png" alt="MKS Logo" class="brand-logo" />
+        <img src="assets/mks.png" alt="MKS Logo" class="brand-logo" />
         <div class="brand-text">
           <span class="brand-name">MKS</span>
           <span class="brand-markos">DashBoard</span>
@@ -46,8 +130,11 @@
         <button data-view="products" class="nav-btn"><span class="nav-icon">💊</span> Productos</button>
         <button data-view="import" class="nav-btn"><span class="nav-icon">📥</span> Importar Excel</button>
         
+        <!-- Mi Perfil -->
+        <button data-view="profile" class="nav-btn" style="margin-top: auto; border-top: 1px solid var(--border); border-radius: 0;"><span class="nav-icon">👤</span> Mi Perfil</button>
+
         <!-- Switch de Modo Oscuro -->
-        <div class="theme-switch-nav" style="margin-top: auto; padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border);">
+        <div class="theme-switch-nav" style="padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border);">
           <div class="nav-icon" id="darkModeIcon">🌙</div>
           <span id="darkModeText" style="font-size: 13px; font-weight: 600; flex: 1; color: var(--muted);">Modo Oscuro</span>
           <label class="theme-switch" for="darkModeToggle">
@@ -62,11 +149,11 @@
     <main class="main">
       <header class="topbar">
         <div class="topbar-left">
-          <img src="mks.png" alt="MKS" class="topbar-mobile-logo" />
+          <img src="assets/mks.png" alt="MKS" class="topbar-mobile-logo" />
           <img src="https://www.laboratoriosmarkos.com/public/front/images/lfm-1315x333.png" alt="Markos" class="topbar-logo" />
           <div>
             <h1 id="pageTitle">Inicio</h1>
-            <p class="subtitle">Bienvenida, Paola Rivera · Farmacéuticos Markos</p>
+            <p class="subtitle" id="subtitleWelcome">Bienvenida, Usuario · Farmacéuticos Markos</p>
           </div>
         </div>
         <div class="topbar-actions">
@@ -75,8 +162,8 @@
         <div class="profile">
           <div class="avatar-wrap">
             <img id="profileImg" src="" alt="Perfil" class="avatar" />
-            <input id="profileUpload" type="file" accept="image/*" title="Cambiar foto de perfil" />
           </div>
+          <button id="logoutBtn" class="btn-logout" title="Cerrar sesión">⏻</button>
         </div>
       </header>
 
@@ -273,7 +360,12 @@
         <div class="section-card">
           <div class="products-header">
             <h2 class="form-title">Clientes</h2>
-            <button id="addClientBtn" class="btn primary">➕ Nuevo Cliente</button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button id="importClientsBtn" class="btn secondary" style="background: #e2e8f0;">📥 Importar Excel</button>
+              <button id="exportClientsBtn" class="btn secondary" style="background: #e2e8f0;">📄 Exportar Excel</button>
+              <button id="addClientBtn" class="btn primary">➕ Nuevo Cliente</button>
+            </div>
+            <input type="file" id="importClientsInput" accept=".xlsx, .xls" class="hidden" />
           </div>
           <div id="clientsGrid" class="clients-grid"></div>
         </div>
@@ -285,10 +377,13 @@
           <div class="products-header">
             <h2 class="form-title">Productos</h2>
             <div style="display: flex; gap: 10px;">
+              <button id="importProductsBtn" class="btn secondary" style="background: #e2e8f0;">📥 Importar</button>
+              <button id="exportProductsBtn" class="btn secondary" style="background: #e2e8f0;">📄 Exportar</button>
               <input type="text" id="productSearchInput" class="filter-input" placeholder="🔍 Buscar producto..." style="width: 200px;">
               <button id="addProductBtn" class="btn primary">➕ Nuevo Producto</button>
             </div>
           </div>
+          <input type="file" id="importProductsInput" accept=".xlsx, .xls" class="hidden" />
           <div id="productsGrid" class="products-grid"></div>
         </div>
       </section>
@@ -316,6 +411,61 @@
             <button id="exportAllBtn" type="button" class="btn primary" style="background: #16a34a;">📥 Exportar todo</button>
           </div>
           <span id="importMessage" class="form-message"></span>
+        </div>
+      </section>
+
+      <!-- MI PERFIL -->
+      <section id="profile" class="view hidden">
+        <div class="form-card" style="max-width: 600px; margin: 0 auto;">
+          <h2 class="form-title">👤 Mi Perfil</h2>
+          
+          <!-- Foto de Perfil -->
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 30px;">
+            <div id="profilePhotoContainer" class="image-preview" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; cursor: default; transition: transform 0.3s; border: 3px solid var(--accent);">
+              <img id="profilePhoto" src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23e2e8f2'/%3E%3Ccircle cx='75' cy='50' r='25' fill='%2394a3b8'/%3E%3Cpath d='M 30 150 Q 30 100 75 100 Q 120 100 120 150' fill='%2394a3b8'/%3E%3C/svg%3E" alt="Foto de perfil" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+          </div>
+
+          <!-- Formulario de Datos -->
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+            <label class="form-label">
+              Nombres
+              <input type="text" id="profileNombres" class="form-control" placeholder="Ej: María Elena" maxlength="50">
+            </label>
+            <label class="form-label">
+              Apellidos
+              <input type="text" id="profileApellidos" class="form-control" placeholder="Ej: García López" maxlength="50">
+            </label>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+            <label class="form-label">
+              DNI
+              <input type="text" id="profileDni" class="form-control" placeholder="Ej: 12345678" maxlength="8" pattern="[0-9]{8}">
+            </label>
+            <label class="form-label">
+              Fecha de Nacimiento
+              <input type="date" id="profileFechaNacimiento" class="form-control">
+            </label>
+          </div>
+
+          <label class="form-label">
+            📧 Correo Electrónico (Tu cuenta)
+            <input type="email" id="profileEmail" class="form-control" disabled style="background: var(--muted); cursor: not-allowed;">
+          </label>
+
+          <label class="form-label">
+            Teléfono
+            <input type="tel" id="profileTelefono" class="form-control" placeholder="Ej: +51 999 123 456" maxlength="20">
+          </label>
+
+          <!-- Botones de Acción -->
+          <div class="form-actions" style="gap: 12px;">
+            <button id="saveProfileBtn" class="btn primary" style="flex: 1;">💾 Guardar Cambios</button>
+            <button id="cancelProfileBtn" class="btn secondary" style="flex: 1;">Cancelar</button>
+          </div>
+
+          <span id="profileMessage" class="form-message" style="text-align: center; margin-top: 16px;"></span>
         </div>
       </section>
 

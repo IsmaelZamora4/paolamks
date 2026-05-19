@@ -89,7 +89,7 @@ onFirebaseReady(() => {
       container.id = 'toastContainer';
       container.style.cssText = `
         position: fixed;
-        bottom: 20px;
+        top: 20px;
         right: 20px;
         z-index: 9999;
         display: flex;
@@ -146,6 +146,7 @@ onFirebaseReady(() => {
     if (v === 'history')   loadHistory();
     if (v === 'products')  loadProducts();
     if (v === 'clients')   loadClients();
+    if (v === 'profile')   loadProfileView();
     updateExportFilteredButton();
   }));
   updateExportFilteredButton();
@@ -159,10 +160,12 @@ onFirebaseReady(() => {
 
   // ─── CACHÉ GLOBAL ────────────────────────────────────────
   async function refreshCache() {
+    const uid = window.currentUser?.uid;
+    if (!uid) return;
     const [cs, ps, vs] = await Promise.all([
-      db.collection('clientes').get(),
-      db.collection('productos').get(),
-      db.collection('ventas').get()
+      db.collection('clientes').where('userId', '==', uid).get(),
+      db.collection('productos').where('userId', '==', uid).get(),
+      db.collection('ventas').where('userId', '==', uid).get()
     ]);
     clientsCache  = cs.docs.map(d => ({ id: d.id, ...d.data() }));
     productsCache = ps.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -218,6 +221,7 @@ onFirebaseReady(() => {
 
       // Mostrar dashboard con datos críticos
       await loadQuotaMeta();
+      await updateWelcomeSubtitle();
       loadProfile();
       
       // Esperar a que Chart.js esté disponible antes de renderizar gráficos
@@ -236,17 +240,15 @@ onFirebaseReady(() => {
           console.log('✅ Productos cargados en background:', productsCache.length);
         }
       }, 100);
-
     } catch (err) {
-      console.error('Error en carga progresiva:', err);
+      console.error('❌ Error en loadDataProgressive:', err);
       hideSkeletons();
-      // Intentar cargar del caché como fallback
-      await refreshCache();
-      await loadQuotaMeta();
-      loadProfile();
-      loadDashboard();
+      showToast('Error cargando datos: ' + err.message, 'error');
     }
   }
+
+  // Exportar a window para que auth.js pueda acceder
+  window.loadDataProgressive = loadDataProgressive;
 
   // ─── SKELETON SCREENS ────────────────────────────────────
   function showSkeletons() {
@@ -358,8 +360,19 @@ onFirebaseReady(() => {
     const key = `${clienteId}_${productoId}`;
     if (priceCache.hasOwnProperty(key)) return priceCache[key];
     try {
-      const doc = await db.collection('precios').doc(key).get();
-      const precio = doc.exists ? doc.data().precio : null;
+      const uid = firebase.auth().currentUser?.uid;
+      if (!uid) {
+        console.warn(`⚠️ getPrice: Sin usuario autenticado`);
+        priceCache[key] = null;
+        return null;
+      }
+      const snap = await db.collection('precios')
+        .where('userId', '==', uid)
+        .where('clienteId', '==', clienteId)
+        .where('productoId', '==', productoId)
+        .limit(1)
+        .get();
+      const precio = snap.docs[0]?.data().precio || null;
       priceCache[key] = precio;
       return precio;
     } catch (err) {
@@ -370,6 +383,11 @@ onFirebaseReady(() => {
   }
 
   async function getMultiplePrices(ventas) {
+    const uid = firebase.auth().currentUser?.uid;
+    if (!uid) {
+      console.warn(`⚠️ getMultiplePrices: Sin usuario autenticado`);
+      return {};
+    }
     const keys = [...new Set(ventas.map(v => `${v.clienteId}_${v.productoId}`))];
     const missing = keys.filter(k => !priceCache.hasOwnProperty(k));
     if (missing.length) {
@@ -415,29 +433,17 @@ onFirebaseReady(() => {
   })();
 
   // ─── PERFIL ───────────────────────────────────────────────
-  document.getElementById('profileUpload').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { showToast('Por favor, selecciona una imagen válida', 'warning'); return; }
-    if (file.size > 2 * 1024 * 1024) { showToast('La imagen debe ser menor a 2MB', 'warning'); return; }
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Data = event.target.result;
-        await db.collection('settings').doc('profile').set({ photo: base64Data, updated: Date.now() }, { merge: true });
-        loadProfile();
-        showToast('✓ Foto guardada correctamente', 'success');
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error('Error al guardar foto:', err);
-      showToast('Error al guardar la foto: ' + err.message, 'error');
-    }
-  });
+  // Funcionalidad de subida de fotos eliminada por requerimiento de diseño estático.
 
   async function loadProfile() {
     try {
-      const doc = await db.collection('settings').doc('profile').get();
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        document.getElementById('profileImg').src = fallbackImg;
+        return;
+      }
+
+      const doc = await db.collection('profile').doc(user.uid).get();
       const photoData = (doc.exists && doc.data().photo) ? doc.data().photo : fallbackImg;
       document.getElementById('profileImg').src = photoData;
     } catch (err) {
@@ -445,6 +451,151 @@ onFirebaseReady(() => {
       document.getElementById('profileImg').src = fallbackImg;
     }
   }
+
+  // ─── PERFIL COMPLETO ────────────────────────────────────
+  async function updateWelcomeSubtitle() {
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) return;
+
+      const doc = await db.collection('profile').doc(user.uid).get();
+      const profileData = doc.exists ? doc.data() : {};
+      const nombresArr = (profileData.nombres || 'Usuario').trim().split(' ');
+      const apellidosArr = (profileData.apellidos || '').trim().split(' ');
+      
+      const firstNombre = nombresArr[0];
+      const firstApellido = apellidosArr[0] || '';
+      const shortName = `${firstNombre} ${firstApellido}`.trim();
+
+      document.getElementById('subtitleWelcome').textContent = `Bienvenida, ${shortName} · Farmacéuticos Markos`;
+    } catch (err) {
+      console.warn('No se pudo actualizar el saludo:', err);
+    }
+  }
+
+  async function syncProfilePhotoToTopbar() {
+    try {
+      const photo = document.getElementById('profilePhoto').src;
+      if (photo && photo !== fallbackImg) {
+        document.getElementById('profileImg').src = photo;
+      }
+    } catch (err) {
+      console.warn('Error sincronizando foto:', err);
+    }
+  }
+
+  async function loadProfileView() {
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        showToast('❌ Usuario no autenticado', 'error');
+        return;
+      }
+
+      // Cargar datos del perfil desde Firestore
+      const doc = await db.collection('profile').doc(user.uid).get();
+      const profileData = doc.exists ? doc.data() : {};
+
+      // Llenar el formulario
+      document.getElementById('profileNombres').value = profileData.nombres || '';
+      document.getElementById('profileApellidos').value = profileData.apellidos || '';
+      document.getElementById('profileDni').value = profileData.dni || '';
+      document.getElementById('profileFechaNacimiento').value = profileData.fechaNacimiento || '';
+      document.getElementById('profileEmail').value = user.email || '';
+      document.getElementById('profileTelefono').value = profileData.telefono || '';
+
+      // Cargar foto de perfil
+      if (profileData.photo) {
+        document.getElementById('profilePhoto').src = profileData.photo;
+        await syncProfilePhotoToTopbar();
+      }
+
+      // Actualizar saludo en topbar
+      await updateWelcomeSubtitle();
+
+      console.log('✅ Perfil cargado correctamente');
+    } catch (err) {
+      console.error('Error cargando perfil:', err);
+      showToast('⚠️ Error al cargar datos del perfil', 'warning');
+    }
+  }
+
+  async function saveProfile() {
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        showToast('❌ Usuario no autenticado', 'error');
+        return;
+      }
+
+      const nombres = document.getElementById('profileNombres').value.trim();
+      const apellidos = document.getElementById('profileApellidos').value.trim();
+      const dni = document.getElementById('profileDni').value.trim();
+      const fechaNacimiento = document.getElementById('profileFechaNacimiento').value;
+      const telefono = document.getElementById('profileTelefono').value.trim();
+
+      if (!nombres || !apellidos) {
+        showToast('⚠️ Nombres y apellidos son requeridos', 'warning');
+        return;
+      }
+
+      if (dni && dni.length !== 8) {
+        showToast('⚠️ DNI debe tener 8 dígitos', 'warning');
+        return;
+      }
+
+      const profileData = {
+        nombres,
+        apellidos,
+        dni,
+        fechaNacimiento,
+        telefono,
+        userId: user.uid,
+        email: user.email,
+        updatedAt: new Date()
+      };
+
+      // Guardar foto si existe
+      const photo = document.getElementById('profilePhoto').src;
+      if (photo && photo !== fallbackImg) {
+        profileData.photo = photo;
+      }
+
+      await db.collection('profile').doc(user.uid).set(profileData, { merge: true });
+      
+      // Sincronizar foto con topbar
+      await syncProfilePhotoToTopbar();
+      
+      // Actualizar saludo en topbar
+      await updateWelcomeSubtitle();
+      
+      showToast('Perfil guardado exitosamente', 'success');
+      console.log('✅ Perfil guardado:', profileData);
+    } catch (err) {
+      console.error('Error guardando perfil:', err);
+      showToast('❌ Error al guardar perfil: ' + err.message, 'error');
+    }
+  }
+
+  // Event Listeners para Perfil
+  document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
+  document.getElementById('cancelProfileBtn')?.addEventListener('click', () => {
+    loadProfileView(); // Recarga los datos originales
+    showToast('✅ Cambios cancelados', 'info');
+  });
+
+  // Logout
+  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    if (confirm('¿Cerrar sesión?')) {
+      firebase.auth().signOut().then(() => {
+        console.log('✅ Sesión cerrada');
+        window.location.href = window.location.pathname;
+      }).catch(err => {
+        console.error('Error al cerrar sesión:', err);
+        showToast('❌ Error al cerrar sesión', 'error');
+      });
+    }
+  });
 
   // ─── RELOJ Y UBICACIÓN ──────────────────────────────────
   let userLocation = 'Detectando...';
@@ -535,7 +686,7 @@ onFirebaseReady(() => {
     if (wList) wList.innerHTML = advertencias.length ? advertencias.map(a => `<li class="alert-item">⚠️ ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin advertencias</li>';
     if (dList) dList.innerHTML = urgentes.length ? urgentes.map(a => `<li class="alert-item">${a.tipo === 'vencido' ? '💀' : '🔴'} ${a.texto}</li>`).join('') : '<li class="alert-item muted">Sin alertas urgentes</li>';
 
-    renderProximasRecompras();
+    renderProximasRecompras(3);
     renderFeaturedProducts();
     renderRecentSales();
     
@@ -853,8 +1004,10 @@ onFirebaseReady(() => {
   // ─── CUOTA DEL MES ────────────────────────────────────────
   async function loadQuotaMeta() {
     try {
-      const doc = await db.collection('settings').doc('quotaMeta').get();
-      quotaMeta = doc.exists ? (doc.data().meta || 0) : 0;
+      const uid = window.currentUser?.uid;
+      if (!uid) { console.warn('No hay usuario logueado para cargar la cuota.'); quotaMeta = 0; return; }
+      const doc = await db.collection('settings').doc(uid).get(); // Asumiendo que la cuota es específica del usuario
+      quotaMeta = doc.exists ? (doc.data().quotaMeta || 0) : 0; // Asumiendo que el campo es 'quotaMeta' dentro del documento de configuración del usuario
     } catch (err) {
       console.error('Error cargando cuota:', err);
       quotaMeta = 0;
@@ -863,7 +1016,9 @@ onFirebaseReady(() => {
 
   async function saveQuotaMeta(newQuota) {
     try {
-      await db.collection('settings').doc('quotaMeta').set({ meta: newQuota, updated: Date.now() }, { merge: true });
+      const uid = window.currentUser?.uid;
+      if (!uid) { showToast('No hay usuario logueado para guardar la cuota.', 'error'); return; }
+      await db.collection('settings').doc(uid).set({ quotaMeta: newQuota, updated: Date.now() }, { merge: true });
       quotaMeta = newQuota;
       renderQuotaChart();
       cancelQuotaEdit();
@@ -2354,6 +2509,118 @@ async function registerBatchSales() {
   document.getElementById('closeAddProductModal')?.addEventListener('click', () => document.getElementById('addProductModal').classList.add('hidden'));
   document.getElementById('cancelAddProductBtn')?.addEventListener('click', () => document.getElementById('addProductModal').classList.add('hidden'));
   document.getElementById('confirmAddProductBtn')?.addEventListener('click', addNewProduct);
+  document.getElementById('registerBatchBtn')?.addEventListener('click', registerBatchSales);
+
+  // ─── EXPORTAR/IMPORTAR ESPECÍFICO (CLIENTES Y PRODUCTOS) ───
+  
+  // Clientes
+  document.getElementById('exportClientsBtn')?.addEventListener('click', () => {
+    const data = clientsCache.map(c => ({
+      ID: c.id,
+      Nombre: c.nombre,
+      RUC: c.ruc || '',
+      Contacto: c.contacto || '',
+      Email: c.email || '',
+      Dirección: c.direccion || '',
+      Logo_URL: c.imagen || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+    XLSX.writeFile(wb, `clientes_mks_${new Date().toISOString().slice(0,10)}.xlsx`);
+  });
+
+  document.getElementById('importClientsBtn')?.addEventListener('click', () => document.getElementById('importClientsInput').click());
+  document.getElementById('importClientsInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('Procesando clientes...', 'info');
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+      
+      const batch = db.batch();
+      rows.forEach(row => {
+        const id = row.ID || 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const ref = db.collection('clientes').doc(id);
+        batch.set(ref, {
+          nombre: row.Nombre || 'Sin Nombre',
+          ruc: String(row.RUC || ''),
+          contacto: String(row.Contacto || ''),
+          email: String(row.Email || ''),
+          direccion: String(row.Dirección || ''),
+          imagen: String(row.Logo_URL || '')
+        }, { merge: true });
+      });
+      await batch.commit();
+      showToast(`${rows.length} Clientes actualizados/importados`, 'success');
+      await refreshCache();
+      loadClients();
+    } catch (err) {
+      showToast('Error al importar clientes: ' + err.message, 'error');
+    }
+    e.target.value = '';
+  });
+
+  // Productos
+  document.getElementById('exportProductsBtn')?.addEventListener('click', () => {
+    const data = productsCache.map(p => ({
+      ID: p.id,
+      Nombre: p.nombre,
+      Presentación: p.presentacion || '',
+      Descripción: p.descripcion || '',
+      VVF: p.vvf || 0,
+      'Dcto Base %': ((p.dctoBase || 0) * 100).toFixed(2),
+      PVF: p.pvf || 0,
+      Imagen_URL: p.imagen || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Productos");
+    XLSX.writeFile(wb, `productos_mks_${new Date().toISOString().slice(0,10)}.xlsx`);
+  });
+
+  document.getElementById('importProductsBtn')?.addEventListener('click', () => document.getElementById('importProductsInput').click());
+  document.getElementById('importProductsInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('Procesando productos...', 'info');
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+      
+      const batch = db.batch();
+      rows.forEach(row => {
+        const id = row.ID || 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const ref = db.collection('productos').doc(id);
+        
+        // Convertir % de descuento a decimal
+        let dcto = parseFloat(row['Dcto Base %']) || 0;
+        if (dcto > 1) dcto = dcto / 100;
+
+        batch.set(ref, {
+          nombre: row.Nombre || 'Sin Nombre',
+          presentacion: String(row.Presentación || ''),
+          descripcion: String(row.Descripción || ''),
+          vvf: parseFloat(row.VVF) || 0,
+          dctoBase: dcto,
+          pvf: parseFloat(row.PVF) || 0,
+          imagen: String(row.Imagen_URL || '')
+        }, { merge: true });
+      });
+      await batch.commit();
+      showToast(`${rows.length} Productos actualizados/importados`, 'success');
+      await refreshCache();
+      loadProducts();
+    } catch (err) {
+      showToast('Error al importar productos: ' + err.message, 'error');
+    }
+    e.target.value = '';
+  });
 
   // Previsualización de imagen en modales de agregar
   document.getElementById('newClientImageUrl')?.addEventListener('change', () => {
