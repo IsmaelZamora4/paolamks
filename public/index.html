@@ -290,7 +290,13 @@
       <!-- REGISTRAR VENTA MÚLTIPLE con búsqueda -->
       <section id="register" class="view hidden">
         <div class="form-card" style="max-width: 100%;">
-          <h2 class="form-title">Registrar Venta Múltiple</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 class="form-title" style="margin-bottom: 0;">Registrar Venta Múltiple</h2>
+            <div class="form-actions">
+              <button id="registerBatchBtn" type="button" class="btn primary" style="margin: 0;">Registrar ventas seleccionadas</button>
+              <span id="batchMessage" class="form-message"></span>
+            </div>
+          </div>
           <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
             <label class="form-label">Cliente
               <select id="clientSelect" class="form-control"></select>
@@ -304,10 +310,6 @@
               <thead><tr><th>Imagen</th><th>Producto</th><th>Presentación</th><th>Precio (S/)</th><th>Cantidad</th><th>Lote</th><th>Vencimiento</th><th>Seleccionar</th></tr></thead>
               <tbody id="batchTableBody"><tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr></tbody>
             </table>
-          </div>
-          <div class="form-actions" style="margin-top: 20px;">
-            <button id="registerBatchBtn" type="button" class="btn primary">Registrar ventas seleccionadas</button>
-            <span id="batchMessage" class="form-message"></span>
           </div>
         </div>
       </section>

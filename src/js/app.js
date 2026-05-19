@@ -1293,9 +1293,9 @@ onFirebaseReady(() => {
     const tbody = document.getElementById('batchTableBody');
     tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Cargando productos...</td</tr>';
     
-    const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
+    const currentUid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
     const preciosSnapshot = await db.collection('precios')
-      .where('userId', '==', uid)
+      .where('userId', '==', currentUid)
       .where('clienteId', '==', clienteId)
       .get();
     const preciosMap = new Map();
@@ -1317,6 +1317,7 @@ onFirebaseReady(() => {
           <td class="price-cell">
             <input type="number" step="0.01" class="form-control price-input" value="${precio.toFixed(2)}" style="width:100px; display:inline-block;">
             <button type="button" class="btn-icon update-price-btn" data-product-id="${prod.id}" data-price-doc-id="${priceDocId}" style="margin-left:5px;" title="Actualizar/crear precio base para este cliente">💾</button>
+            <button type="button" class="btn-icon bonus-btn" style="margin-left:5px;" title="Bonificación (Precio 0)">🎁</button>
           </td>
           <td><input type="number" class="form-control batch-cantidad" style="width:80px;" min="0" step="1" value="0"></td>
           <td><input type="text" class="form-control batch-lote" style="width:120px;" placeholder="Lote"></td>
@@ -1369,7 +1370,7 @@ onFirebaseReady(() => {
             await db.collection('precios').doc(priceDocId).update({ precio: newPrice });
           } else {
             const newDocRef = db.collection('precios').doc();
-            await newDocRef.set({ clienteId, productoId: productId, precio: newPrice });
+            await newDocRef.set({ clienteId, productoId: productId, precio: newPrice, userId: currentUid });
             priceDocId = newDocRef.id;
             btn.dataset.priceDocId = priceDocId;
             row.dataset.priceDocId = priceDocId;
@@ -1383,12 +1384,22 @@ onFirebaseReady(() => {
       });
     });
 
+    document.querySelectorAll('.bonus-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('tr');
+        row.querySelector('.price-input').value = "0.00";
+        showToast('Producto marcado como bonificación (S/ 0.00)', 'info');
+      });
+    });
+
     filterProductTable();
   }
 
 async function registerBatchSales() {
   const clienteId = window.clientSelect ? window.clientSelect.value : document.getElementById('clientSelect').value;
   if (!clienteId) { showToast('Selecciona un cliente primero', 'warning'); return; }
+  const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
+  if (!uid) { showToast('Usuario no identificado', 'error'); return; }
   const rows = document.querySelectorAll('#batchTableBody tr');
   const ventasParaGuardar = [];
   
@@ -1410,7 +1421,7 @@ async function registerBatchSales() {
     
     const precioInput = row.querySelector('.price-input');
     const precio = parseFloat(precioInput.value);
-    if (isNaN(precio) || precio <= 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
+    if (isNaN(precio) || precio < 0) { showToast(`Precio inválido para ${productoId}`, 'error'); return; }
     
     const now = new Date();
     const mesCompra = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -1419,7 +1430,8 @@ async function registerBatchSales() {
       fechaVencimiento: new Date(vencimiento),
       fechaVenta: now,
       mesCompra,
-      precioVenta: precio
+      precioVenta: precio,
+      userId: uid
     });
   }
   
@@ -1429,31 +1441,6 @@ async function registerBatchSales() {
   const batch = db.batch();
   
   for (const venta of ventasParaGuardar) {
-    // 1. Preparar referencia del documento de precio (usando el ID compuesto o uno nuevo)
-    let priceDocId = null;
-    // Buscar la fila correspondiente para obtener el priceDocId actual (si existe)
-    for (const row of rows) {
-      if (row.dataset.productoId === venta.productoId) {
-        priceDocId = row.dataset.priceDocId;
-        break;
-      }
-    }
-    if (!priceDocId) {
-      // Si no existe, crear nuevo ID (Firestore lo generará automáticamente)
-      const newPriceRef = db.collection('precios').doc();
-      priceDocId = newPriceRef.id;
-      // Actualizar el atributo data-price-doc-id en la fila para futuras referencias (opcional)
-      const targetRow = Array.from(rows).find(r => r.dataset.productoId === venta.productoId);
-      if (targetRow) targetRow.dataset.priceDocId = priceDocId;
-    }
-    const priceRef = db.collection('precios').doc(priceDocId);
-    batch.set(priceRef, {
-      clienteId: venta.clienteId,
-      productoId: venta.productoId,
-      precio: venta.precioVenta
-    });
-    
-    // 2. Registrar la venta (Firestore asigna ID automáticamente)
     const ventaRef = db.collection('ventas').doc();
     batch.set(ventaRef, {
       clienteId: venta.clienteId,
@@ -1463,7 +1450,8 @@ async function registerBatchSales() {
       fechaVencimiento: venta.fechaVencimiento,
       fechaVenta: venta.fechaVenta,
       mesCompra: venta.mesCompra,
-      precioVenta: venta.precioVenta
+      precioVenta: venta.precioVenta,
+      userId: uid
     });
   }
   
@@ -1476,11 +1464,9 @@ async function registerBatchSales() {
     // Actualizar cachés locales
     for (const venta of ventasParaGuardar) {
       ventasCache.push({ id: Date.now() + Math.random(), ...venta });
-      const key = `${venta.clienteId}_${venta.productoId}`;
-      priceCache[key] = venta.precioVenta;
     }
     
-    showToast(`✓ ${ventasParaGuardar.length} ventas registradas y precios actualizados`, 'success');
+    showToast(`✓ ${ventasParaGuardar.length} ventas registradas`, 'success');
     
     // Limpiar formulario
     document.querySelectorAll('.batch-cantidad').forEach(inp => inp.value = '0');
@@ -1857,7 +1843,26 @@ async function registerBatchSales() {
     document.getElementById('editSaleId').value = venta.id;
     document.getElementById('editCantidad').value = venta.cantidad || 1;
     document.getElementById('editLote').value = venta.lote || '';
-    document.getElementById('editPrecioVenta').value = venta.precioVenta || 0;
+    const precioInput = document.getElementById('editPrecioVenta');
+    precioInput.value = venta.precioVenta || 0;
+
+    // Inyectar botón de regalo si no existe en el modal de edición
+    let bonusBtn = document.getElementById('editSaleBonusBtn');
+    if (!bonusBtn) {
+      bonusBtn = document.createElement('button');
+      bonusBtn.id = 'editSaleBonusBtn';
+      bonusBtn.type = 'button';
+      bonusBtn.className = 'btn-icon';
+      bonusBtn.style.marginLeft = '5px';
+      bonusBtn.innerHTML = '🎁';
+      bonusBtn.title = 'Marcar como bonificación';
+      bonusBtn.onclick = () => {
+        precioInput.value = "0.00";
+        showToast('Aplicada bonificación (S/ 0.00)', 'info');
+      };
+      precioInput.after(bonusBtn);
+    }
+
     if (venta.fechaVencimiento) { const date = toDateObj(venta.fechaVencimiento); if (date) document.getElementById('editFechaVencimiento').value = date.toISOString().split('T')[0]; }
     else document.getElementById('editFechaVencimiento').value = '';
     const updateEditProductImage = () => { const product = productsCache.find(p => p.id === productSelect.value); document.getElementById('editProductImg').src = (product && product.imagen && !product.imagen.includes('via.placeholder')) ? product.imagen : fallbackImg; };
@@ -1887,7 +1892,7 @@ async function registerBatchSales() {
     if (isNaN(cantidad) || cantidad <= 0) { showToast('Cantidad positiva requerida', 'error'); msg.textContent = 'Cantidad positiva requerida'; msg.style.color = 'var(--danger)'; return; }
     if (!lote) { showToast('Lote requerido', 'error'); msg.textContent = 'Lote requerido'; msg.style.color = 'var(--danger)'; return; }
     if (!fechaVencimiento) { showToast('Fecha de vencimiento requerida', 'error'); msg.textContent = 'Fecha de vencimiento requerida'; msg.style.color = 'var(--danger)'; return; }
-    if (isNaN(precioVenta) || precioVenta <= 0) { showToast('Precio unitario positivo requerido', 'error'); msg.textContent = 'Precio unitario positivo requerido'; msg.style.color = 'var(--danger)'; return; }
+    if (isNaN(precioVenta) || precioVenta < 0) { showToast('Precio unitario no puede ser negativo', 'error'); msg.textContent = 'Precio unitario no puede ser negativo'; msg.style.color = 'var(--danger)'; return; }
     msg.textContent = 'Guardando...'; msg.style.color = 'var(--muted)';
     try {
       const updateData = { clienteId, productoId, cantidad, lote, precioVenta, fechaVencimiento: new Date(fechaVencimiento) };
@@ -2055,13 +2060,14 @@ async function registerBatchSales() {
     const btn = document.getElementById('confirmAddClientBtn');
     btn.disabled = true;
     try {
+      const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
       const clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-      await db.collection('clientes').doc(clientId).set({ nombre, ruc: ruc || '', contacto: contacto || '', email: email || '', direccion: direccion || '', imagen: imagen || '' });
+      await db.collection('clientes').doc(clientId).set({ nombre, ruc: ruc || '', contacto: contacto || '', email: email || '', direccion: direccion || '', imagen: imagen || '', userId: uid });
       const batch = db.batch();
       for (const prod of productsCache) {
         const precioBase = prod.pvf || 0;
         const priceId = `${clientId}_${prod.id}`;
-        batch.set(db.collection('precios').doc(priceId), { clienteId: clientId, productoId: prod.id, precio: precioBase });
+        batch.set(db.collection('precios').doc(priceId), { clienteId: clientId, productoId: prod.id, precio: precioBase, userId: uid });
       }
       await batch.commit();
       await refreshCache();
@@ -2116,12 +2122,13 @@ async function registerBatchSales() {
     const btn = document.getElementById('confirmAddProductBtn');
     btn.disabled = true;
     try {
+      const uid = window.currentUser ? window.currentUser.uid : firebase.auth().currentUser?.uid;
       const productId = 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-      await db.collection('productos').doc(productId).set({ nombre, presentacion: presentacion || '', descripcion: descripcion || '', vvf, dctoBase, pvf, imagen: imagen || '' });
+      await db.collection('productos').doc(productId).set({ nombre, presentacion: presentacion || '', descripcion: descripcion || '', vvf, dctoBase, pvf, imagen: imagen || '', userId: uid });
       const batch = db.batch();
       for (const client of clientsCache) {
         const priceId = `${client.id}_${productId}`;
-        batch.set(db.collection('precios').doc(priceId), { clienteId: client.id, productoId: productId, precio: pvf });
+        batch.set(db.collection('precios').doc(priceId), { clienteId: client.id, productoId: productId, precio: pvf, userId: uid });
       }
       await batch.commit();
       await refreshCache();
