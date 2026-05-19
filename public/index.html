@@ -14,19 +14,19 @@
   <title>MKS DashBoard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="../src/css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-  <script defer src="firebase.js"></script>
-  <script defer src="performance-optimizer.js"></script>
-  <script defer src="js/auth.js"></script>
-  <script defer src="firestore-optimizations.js"></script>
-  <script defer src="app.js"></script>
-  <script defer src="mobile-optimizations.js"></script>
+  <script defer src="../src/js/firebase.js"></script>
+  <script defer src="../src/js/performance-optimizer.js"></script>
+  <script defer src="../src/js/auth.js"></script>
+  <script defer src="../src/js/firestore-optimizations.js"></script>
+  <script defer src="../src/js/app.js"></script>
+  <script defer src="../src/js/mobile-optimizations.js"></script>
 </head>
 <body>
   <!-- Pantalla de Carga -->
@@ -489,13 +489,14 @@
           <div class="modal-footer"><button id="closeRecomprasBtn" class="btn primary">Cerrar</button></div>
         </div>
       </div>
+
+      <footer class="animated-footer">
+        <div class="footer-content">
+          <span class="footer-text">Todos los derechos reservados</span>
+          <span class="footer-author">© Ismael Zamora</span>
+        </div>
+      </footer>
     </main>
   </div>
-  <footer class="animated-footer">
-    <div class="footer-content">
-      <span class="footer-text">Todos los derechos reservados</span>
-      <span class="footer-author">© Ismael Zamora</span>
-    </div>
-  </footer>
 </body>
 </html>

@@ -85,8 +85,11 @@ function initAuth() {
                 }
             }
 
-            if (authTitle) authTitle.textContent = isRegistering ? 'Crear Cuenta' : 'Iniciar Sesión';
-            if (btnAuthMain) btnAuthMain.textContent = isRegistering ? 'Registrarse' : 'Entrar';
+            if (authTitle) authTitle.textContent = isRegistering ? 'Crear Nueva Cuenta' : 'Bienvenido de Nuevo';
+            if (btnAuthMain) {
+                const btnSpan = btnAuthMain.querySelector('.btn-text');
+                if (btnSpan) btnSpan.textContent = isRegistering ? 'Completar Registro' : 'Entrar al Panel';
+            }
             switchLink.textContent = isRegistering ? 'Ya tengo cuenta, entrar' : 'Regístrate aquí';
         });
     }
@@ -101,12 +104,12 @@ function initAuth() {
             const btn = document.getElementById('btnAuthMain');
             const btnText = btn.querySelector('.btn-text');
             const btnLoader = btn.querySelector('.btn-loader');
-            const card = document.querySelector('.auth-card-premium');
+            const card = document.querySelector('.auth-card-premium') || document.querySelector('.auth-card');
             
             try {
                 btn.disabled = true;
-                btnText.classList.add('hidden');
-                btnLoader.classList.remove('hidden');
+                if (btnText) btnText.classList.add('hidden');
+                if (btnLoader) btnLoader.classList.remove('hidden');
 
                 if (isRegistering) {
                     // 1. Crear usuario en Auth
@@ -196,15 +199,15 @@ function initAuth() {
                 }
             } catch (err) {
                 // Micro-interacción: Error Shake
-                card.classList.add('shake');
-                setTimeout(() => card.classList.remove('shake'), 500);
+                if (card) card.classList.add('shake');
+                setTimeout(() => card && card.classList.remove('shake'), 500);
 
                 if (window.showToast) window.showToast('Error: ' + err.message, 'error');
                 console.error('Auth error:', err);
             } finally {
                 btn.disabled = false;
-                btnText.classList.remove('hidden');
-                btnLoader.classList.add('hidden');
+                if (btnText) btnText.classList.remove('hidden');
+                if (btnLoader) btnLoader.classList.add('hidden');
             }
         });
     }

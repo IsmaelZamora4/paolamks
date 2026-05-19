@@ -15,15 +15,20 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 const auth = firebase.auth();
 
-db.enablePersistence()
-  .catch(err => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Persistencia no disponible: múltiples pestañas abiertas');
-    } else {
-      console.warn('Error al habilitar persistencia:', err);
-    }
-  });
+// Nueva configuración de caché recomendada
+db.settings({
+  cache: {
+    persistence: 'indexeddb',
+    synchronizeTabs: true // Habilita la sincronización entre múltiples pestañas
+  }
+});
 
+// Opcional: Si quieres mantener el manejo de errores de persistencia, puedes usar esto:
+// db.enablePersistence().catch(err => {
+//   if (err.code === 'failed-precondition') {
+//     console.warn('Persistencia no disponible: múltiples pestañas abiertas. Asegúrate de que solo una pestaña tenga la persistencia habilitada o que synchronizeTabs esté en true.');
+//   } else { console.warn('Error al habilitar persistencia:', err); }
+// });
 window.db = db;
 window.storage = storage;
 window.auth = auth;

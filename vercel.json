@@ -1,6 +1,6 @@
 {
-  "buildCommand": "echo 'Static site - no build needed'",
-  "outputDirectory": ".",
+  "buildCommand": "mkdir -p public/src && cp -r src/* public/src/",
+  "outputDirectory": "public",
   "public": true,
   "cleanUrls": false,
   "headers": [
