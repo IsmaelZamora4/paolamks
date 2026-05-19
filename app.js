@@ -19,6 +19,37 @@ onFirebaseReady(() => {
   let priceCache = {};
   let quotaMeta = 0;
   let quotaChartInstance = null;
+  let quotaChartType = localStorage.getItem('mks_quota_type') || 'doughnut';
+
+  /* ── CONFIGURACIÓN MODO OSCURO ────────────────────────── */
+  function initDarkMode() {
+    const toggle = document.getElementById('darkModeToggle');
+    const icon = document.getElementById('darkModeIcon');
+    const text = document.getElementById('darkModeText');
+    
+    const setTheme = (isDark) => {
+      document.body.classList.toggle('dark-mode', isDark);
+      if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+      text.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
+      localStorage.setItem('mks_theme', isDark ? 'dark' : 'light');
+      if (toggle) toggle.checked = isDark;
+      
+      // Actualizar colores globales de Chart.js
+      if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = isDark ? '#94a3b8' : '#64748b';
+        Chart.defaults.borderColor = isDark ? '#334155' : '#e2e8f2';
+        // Refrescar gráficos si existen
+        if (typeof loadDashboard === 'function') loadDashboard();
+      }
+    };
+
+    const savedTheme = localStorage.getItem('mks_theme');
+    if (savedTheme === 'dark') setTheme(true);
+
+    toggle?.addEventListener('change', (e) => {
+      setTheme(e.target.checked);
+    });
+  }
 
   const fallbackImg = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" rx="18" fill="#f0f4f8"/><rect x="30" y="50" width="140" height="100" rx="10" fill="#dde3ec"/><circle cx="80" cy="85" r="18" fill="#b0bcc9"/><path d="M40 145 L75 105 L100 130 L125 110 L160 145Z" fill="#c8d2de"/><text x="100" y="175" text-anchor="middle" font-family="system-ui" font-size="13" fill="#8896a5">Sin imagen</text></svg>`);
 
@@ -380,6 +411,7 @@ onFirebaseReady(() => {
   (async () => {
     // Usar carga progresiva en lugar de refreshCache
     await loadDataProgressive();
+    initDarkMode();
   })();
 
   // ─── PERFIL ───────────────────────────────────────────────
@@ -897,28 +929,54 @@ onFirebaseReady(() => {
 
     if (quotaChartInstance) quotaChartInstance.destroy();
 
-    quotaChartInstance = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Cumplido', 'Falta'],
-        datasets: [{
-          data: [Math.round(Math.min(progress, 100) * 100) / 100, Math.round(Math.max(0, 100 - progress) * 100) / 100],
-          backgroundColor: [progressColor, remainingColor],
-          borderColor: ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'],
-          borderWidth: 2,
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '65%',
-        plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatProgressPercent(ctx.parsed)}%` } }
+    if (quotaChartType === 'doughnut') {
+      quotaChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Cumplido', 'Falta'],
+          datasets: [{
+            data: [Math.round(Math.min(progress, 100) * 100) / 100, Math.round(Math.max(0, 100 - progress) * 100) / 100],
+            backgroundColor: [progressColor, remainingColor],
+            borderColor: ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'],
+            borderWidth: 2,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true } },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatProgressPercent(ctx.parsed)}%` } }
+          }
         }
-      }
-    });
+      });
+    } else {
+      quotaChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Progreso'],
+          datasets: [
+            { label: 'Cumplido', data: [totalMes], backgroundColor: progressColor, borderRadius: 6 },
+            { label: 'Meta', data: [quotaMeta], backgroundColor: remainingColor, borderRadius: 6 }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            x: { stacked: false, display: false, max: Math.max(quotaMeta, totalMes) },
+            y: { stacked: false, display: false }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: S/${ctx.parsed.x.toFixed(2)}` } }
+          }
+        }
+      });
+    }
   }
 
   function openQuotaChart() {
@@ -987,6 +1045,16 @@ onFirebaseReady(() => {
   document.getElementById('closeQuotaModal')?.addEventListener('click', closeQuotaChart);
   document.getElementById('closeQuotaBtn')?.addEventListener('click', closeQuotaChart);
   document.querySelector('#quotaModal .modal-overlay')?.addEventListener('click', closeQuotaChart);
+
+  // Listeners para cambiar tipo de gráfico de cuota
+  document.getElementById('setQuotaCircle')?.addEventListener('click', (e) => {
+    e.stopPropagation(); quotaChartType = 'doughnut';
+    localStorage.setItem('mks_quota_type', 'doughnut'); renderQuotaChart();
+  });
+  document.getElementById('setQuotaBar')?.addEventListener('click', (e) => {
+    e.stopPropagation(); quotaChartType = 'bar';
+    localStorage.setItem('mks_quota_type', 'bar'); renderQuotaChart();
+  });
 
   // Event listeners para cuota
   document.getElementById('editQuotaBtn')?.addEventListener('click', editQuotaMeta);
@@ -1367,7 +1435,7 @@ async function registerBatchSales() {
       headerRow.className = 'group-header';
       headerRow.setAttribute('data-group', grupoId);
       headerRow.style.cursor = 'pointer';
-      headerRow.style.backgroundColor = '#f1f5f9';
+      headerRow.style.backgroundColor = 'var(--bg)';
       headerRow.innerHTML = `
         <td colspan="9">
           <span class="toggle-icon">▶</span> <strong>${clienteNombre}</strong> (${ventasCliente.length} pedidos)

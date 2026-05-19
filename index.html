@@ -32,6 +32,7 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand-wrap">
+        <img src="mks.png" alt="MKS Logo" class="brand-logo" />
         <div class="brand-text">
           <span class="brand-name">MKS</span>
           <span class="brand-markos">DashBoard</span>
@@ -44,6 +45,16 @@
         <button data-view="clients" class="nav-btn"><span class="nav-icon">👥</span> Clientes</button>
         <button data-view="products" class="nav-btn"><span class="nav-icon">💊</span> Productos</button>
         <button data-view="import" class="nav-btn"><span class="nav-icon">📥</span> Importar Excel</button>
+        
+        <!-- Switch de Modo Oscuro -->
+        <div class="theme-switch-nav" style="margin-top: auto; padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border);">
+          <div class="nav-icon" id="darkModeIcon">🌙</div>
+          <span id="darkModeText" style="font-size: 13px; font-weight: 600; flex: 1; color: var(--muted);">Modo Oscuro</span>
+          <label class="theme-switch" for="darkModeToggle">
+            <input type="checkbox" id="darkModeToggle" />
+            <div class="slider round"></div>
+          </label>
+        </div>
       </nav>
     </aside>
 
@@ -51,6 +62,7 @@
     <main class="main">
       <header class="topbar">
         <div class="topbar-left">
+          <img src="mks.png" alt="MKS" class="topbar-mobile-logo" />
           <img src="https://www.laboratoriosmarkos.com/public/front/images/lfm-1315x333.png" alt="Markos" class="topbar-logo" />
           <div>
             <h1 id="pageTitle">Inicio</h1>
@@ -100,7 +112,12 @@
           <aside class="dashboard-side">
             <div class="section-card quota-card" style="margin-bottom: 20px;">
               <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <div class="section-title">📊 Meta del mes</div>
+                <div class="section-title" style="display: flex; align-items: center; gap: 8px;">📊 Meta
+                  <div class="quota-type-toggle">
+                    <button id="setQuotaCircle" class="btn-icon" style="padding: 2px 4px; font-size: 10px;" title="Gráfico Circular">⭕</button>
+                    <button id="setQuotaBar" class="btn-icon" style="padding: 2px 4px; font-size: 10px;" title="Barra de Progreso">📊</button>
+                  </div>
+                </div>
                 <button id="editQuotaBtn" class="btn secondary" style="padding: 4px 8px; font-size: 11px;">✏️ Editar</button>
               </div>
               <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; cursor: pointer;" id="quotaChartSection" title="Click para ver gráfico expandido">
