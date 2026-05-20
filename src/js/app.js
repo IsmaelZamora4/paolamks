@@ -790,7 +790,7 @@ onFirebaseReady(() => {
     if (confirm('¿Cerrar sesión?')) {
       firebase.auth().signOut().then(() => {
         console.log('✅ Sesión cerrada');
-        window.location.href = '/public/login.html';
+        window.location.href = '/login.html';
       }).catch(err => {
         console.error('Error al cerrar sesión:', err);
         showToast('❌ Error al cerrar sesión', 'error');

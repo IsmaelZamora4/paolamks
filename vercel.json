@@ -2,11 +2,7 @@
   "rewrites": [
     {
       "source": "/dashboard/:path*",
-      "destination": "/public/dashboard.html"
-    },
-    {
-      "source": "/",
-      "destination": "/public/index.html"
+      "destination": "/dashboard.html"
     }
   ]
 }
