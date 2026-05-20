@@ -6,19 +6,25 @@ function initAuth() {
     const appView = document.getElementById('appView');
     const splash = document.getElementById('splashScreen');
 
-    // Si los elementos no existen, no hacer nada (el DOM puede estar incompleto)
-    if (!authView || !appView) {
-        console.warn("Elementos de autenticación no encontrados, pero continuando...");
-        return;
-    }
-
     // 1. Escuchar cambios de estado de autenticación
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             window.currentUser = user; // Guardar globalmente el usuario actual
-            authView.classList.add('hidden');
-            appView.classList.remove('hidden');
-            if (splash) splash.classList.add('hidden');
+            
+            // Si estamos en la página de login, redirigir al dashboard
+            const path = window.location.pathname;
+            // Prevenir bucles: Si el usuario ya está logueado y está en páginas de acceso, ir al dashboard
+            if (path.includes('login.html') || path.includes('index.html') || path === '/' || !path.includes('dashboard')) {
+                window.location.replace(window.location.origin + '/public/dashboard.html');
+                return;
+            }
+
+            authView?.classList.add('hidden');
+            appView?.classList.remove('hidden');
+            splash?.classList.add('hidden');
+            
+            // Disparar el enrutador una vez que sabemos que hay un usuario
+            if (typeof handleRoute === 'function') handleRoute();
             
             // Inicializar la app con los datos del usuario (esperar a que esté disponible)
             if (window.loadDataProgressive && typeof window.loadDataProgressive === 'function') {
@@ -46,9 +52,18 @@ function initAuth() {
             }
         } else {
             window.currentUser = null;
-            authView.classList.remove('hidden');
-            appView.classList.add('hidden');
-            if (splash) splash.classList.add('hidden');
+            
+            // Si estamos en el dashboard, redirigir al login
+            const path = window.location.pathname;
+            // Ajustado para detectar el archivo físico o la ruta virtual
+            if (path.includes('/dashboard/') || path.includes('dashboard.html')) {
+                window.location.replace(window.location.origin + '/public/login.html');
+                return;
+            }
+            
+            authView?.classList.remove('hidden');
+            appView?.classList.add('hidden');
+            splash?.classList.add('hidden');
         }
     });
 
@@ -202,7 +217,33 @@ function initAuth() {
                 if (card) card.classList.add('shake');
                 setTimeout(() => card && card.classList.remove('shake'), 500);
 
-                if (window.showToast) window.showToast('Error: ' + err.message, 'error');
+                let errorMsg = 'Error al procesar la solicitud';
+
+                // Manejo de errores específicos de Firebase Auth
+                switch (err.code) {
+                    case 'auth/wrong-password':
+                        errorMsg = '⚠️ Contraseña incorrecta. Por favor, verifícala e inténtalo de nuevo.';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMsg = '⚠️ No existe una cuenta registrada con este correo electrónico.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMsg = '⚠️ El formato del correo electrónico no es válido.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMsg = '⚠️ Demasiados intentos fallidos. Inténtalo más tarde.';
+                        break;
+                    default:
+                        errorMsg = 'Error: ' + err.message;
+                }
+
+                if (window.showToast) {
+                    window.showToast(errorMsg, 'error');
+                } else {
+                    // Fallback en caso de que el sistema de toast aún no haya cargado
+                    alert(errorMsg);
+                }
+                
                 console.error('Auth error:', err);
             } finally {
                 btn.disabled = false;

@@ -89,6 +89,13 @@ body.dark-mode .form-control.readonly {
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Deshabilitar el arrastre de imágenes para mejorar la UX y evitar selecciones accidentales */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  user-select: none;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 body {
@@ -192,9 +199,33 @@ body {
   box-shadow: 0 40px 100px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 @keyframes cardEntry { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Botón Casita para volver al Landing */
+.back-home-btn {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  text-decoration: none;
+  font-size: 1.2rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.back-home-btn:hover {
+  background: #e2e8f0;
+  transform: scale(1.1);
+}
 
 .auth-card-premium h2 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 8px; text-align: left; }
 .auth-card-subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; }
@@ -1112,12 +1143,15 @@ body.dark-mode .kpi-card.warn-card {
 .price-value { font-weight: 700; color: var(--accent); font-size: 14px; }
 
 /* Ajuste para que las imágenes en los modales no se vean con zoom */
-#productDetailImg, #featuredPreviewImg {
+#productDetailImg, 
+#featuredPreviewImg {
   width: 100%;
-  height: auto;
+  height: 250px;
+  object-fit: contain;
   background-color: var(--bg);
   border-radius: 12px;
   margin-bottom: 8px;
+  display: block;
 }
 
 /* ─── IMPORTACIÓN ──────────────────────────────────── */
@@ -2319,4 +2353,72 @@ a, button, [role="button"] {
       padding-bottom: max(12px, env(safe-area-inset-bottom));
     }
   }
+}
+
+/* ─── ANIMATED LANDING BACKGROUND ─── */
+.hero-animated-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hero-animated-bg .grid-overlay {
+  position: absolute;
+  inset: -100px;
+  background-image: 
+    linear-gradient(rgba(34, 211, 238, 0.05) 1.5px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1.5px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+  transform: perspective(1000px) rotateX(45deg);
+  animation: gridMoving 20s linear infinite;
+}
+
+@keyframes gridMoving {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 80px; }
+}
+
+.hero-animated-bg .glowing-line {
+  position: absolute;
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, #00f0ff, #0055ff, transparent);
+  opacity: 0.15;
+  filter: blur(2px);
+}
+
+.hero-animated-bg .line-1 { top: 25%; animation: flowX 15s linear infinite; }
+.hero-animated-bg .line-2 { top: 55%; animation: flowX 25s linear infinite reverse; }
+.hero-animated-bg .line-3 { top: 85%; animation: flowX 20s linear infinite; }
+
+@keyframes flowX {
+  0% { transform: translateX(-100%) skewX(-45deg); }
+  100% { transform: translateX(100%) skewX(-45deg); }
+}
+
+.hero-animated-bg .scan-line {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent, rgba(0, 240, 255, 0.03), transparent);
+  height: 200px;
+  width: 100%;
+  animation: scanningEffect 12s linear infinite;
+}
+
+@keyframes scanningEffect {
+  0% { transform: translateY(-200px); }
+  100% { transform: translateY(110vh); }
+}
+
+/* Efecto de pulso en el mockup para que parezca "vivo" */
+.hero-mockup img {
+  animation: imageGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes imageGlow {
+  from { filter: brightness(1) contrast(1); }
+  to { filter: brightness(1.1) contrast(1.05); }
 }

@@ -1,31 +1,12 @@
 {
-  "buildCommand": "mkdir -p public/src && cp -r src/* public/src/",
-  "outputDirectory": "public",
-  "public": true,
-  "cleanUrls": false,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    }
-  ],
   "rewrites": [
     {
-      "source": "/:path*",
-      "destination": "/:path*"
+      "source": "/dashboard/:path*",
+      "destination": "/public/dashboard.html"
+    },
+    {
+      "source": "/",
+      "destination": "/public/index.html"
     }
   ]
 }

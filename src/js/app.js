@@ -3,11 +3,84 @@
 // VERSIÓN COMPLETA + EXPORTACIÓN + FILTRO EN REGISTRO + AGRUPACIÓN POR CLIENTE
 // ============================================================
 
+/**
+ * ─── PROTECCIÓN EXCLUSIVA PARA LANDING PAGE ────────────────
+ * Esta sección solo se ejecuta si NO estamos en el dashboard.
+ * Bloquea la descarga y apertura de imágenes del Landing para proteger el diseño.
+ */
+(function() {
+  const isDashboard = window.location.pathname.includes('dashboard');
+  
+  // SOLO se ejecuta en el Landing Page (index.html)
+  if (!isDashboard) {
+    function setupImageSecurity(img) {
+      if (img.dataset.protected || img.closest('.img-security-wrapper')) return;
+
+      const applyShield = () => {
+        if (img.dataset.protected) return;
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'img-security-wrapper'; // Clase para identificar contenedores protegidos
+        const overlay = document.createElement('div');
+        
+        const style = window.getComputedStyle(img);
+        wrapper.style.position = 'relative';
+        wrapper.style.display = style.display === 'block' ? 'block' : 'inline-block';
+        wrapper.style.verticalAlign = 'middle';
+
+        // CSS Senior: El overlay ahora usa "inset: 0" y bloquea llamadas táctiles en móviles
+        overlay.style.cssText = `
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          z-index: 999;
+          background: rgba(0,0,0,0);
+          cursor: default;
+          user-select: none;
+          -webkit-touch-callout: none;
+        `;
+        
+        img.dataset.protected = 'true';
+        // Evitamos que la propia imagen responda a eventos de puntero
+        img.style.pointerEvents = 'none'; 
+        
+        img.parentNode.insertBefore(wrapper, img);
+        wrapper.appendChild(img);
+        wrapper.appendChild(overlay);
+      };
+
+      if (img.complete) applyShield();
+      else img.addEventListener('load', applyShield);
+    }
+
+    // Bloqueo global de clic derecho en cualquier cosa relacionada con imágenes en el Landing
+    document.addEventListener('contextmenu', (e) => {
+      if (e.target.tagName === 'IMG' || e.target.closest('.img-security-wrapper')) {
+        e.preventDefault();
+      }
+    }, true);
+
+    document.addEventListener('dragstart', (e) => {
+      if (e.target.tagName === 'IMG' || e.target.closest('.img-security-wrapper')) {
+        e.preventDefault();
+      }
+    }, true);
+
+    const securityObserver = new MutationObserver(mutations => {
+      mutations.forEach(m => m.addedNodes.forEach(node => {
+        if (node.tagName === 'IMG') setupImageSecurity(node);
+        else if (node.querySelectorAll) node.querySelectorAll('img').forEach(setupImageSecurity);
+      }));
+    });
+    securityObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('load', () => document.querySelectorAll('img').forEach(setupImageSecurity));
+  }
+})();
+
 function onFirebaseReady(cb) {
-  if (window.db && window.storage) { cb(); return; }
+  if (window.db) { cb(); return; }
   window.addEventListener('firebase-ready', cb);
   const wait = setInterval(() => {
-    if (window.db && window.storage) { clearInterval(wait); cb(); }
+    if (window.db) { clearInterval(wait); cb(); }
   }, 200);
 }
 
@@ -82,7 +155,8 @@ onFirebaseReady(() => {
   }
 
   // ─── NOTIFICACIONES TOAST ──────────────────────────────
-  function showToast(message, type = 'info') {
+  // Hacemos que la función sea global para que auth.js y otros archivos puedan usarla
+  window.showToast = function(message, type = 'info') {
     let container = document.getElementById('toastContainer');
     if (!container) {
       container = document.createElement('div');
@@ -133,29 +207,73 @@ onFirebaseReady(() => {
     }
   }
 
-  navBtns.forEach(b => b.addEventListener('click', () => {
+  // ─── RUTAS Y NAVEGACIÓN SPA ──────────────────────────────
+  const routes = {
+    'inicio': 'dashboard',
+    'registerventa': 'register',
+    'historial': 'history',
+    'clientes': 'clients',
+    'productos': 'products',
+    'importar': 'import',
+    'perfil': 'profile'
+  };
+
+  function navigateTo(pathSegment) {
+    const path = `/dashboard/${pathSegment}`;
+    history.pushState({ view: pathSegment }, '', path);
+    handleRoute();
+  }
+
+  function handleRoute() {
+    // Evitar ejecutar el enrutamiento si no estamos en la página del dashboard (previene bucles en login.html)
+    if (!window.location.pathname.includes('dashboard.html') && !window.location.pathname.includes('/dashboard/')) return;
+
+    // Solo ejecutar el enrutamiento si estamos en la vista de la aplicación (dashboard)
+    if (!document.getElementById('appView') || document.getElementById('appView').classList.contains('hidden')) return;
+
+    const pathParts = window.location.pathname.split('/');
+    let routeKey = pathParts[pathParts.length - 1];
+    
+    if (!routes[routeKey]) {
+      routeKey = 'inicio';
+      history.replaceState({ view: 'inicio' }, '', '/dashboard/inicio');
+    }
+
+    const v = routes[routeKey];
+
     navBtns.forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    const v = b.dataset.view;
+    const activeBtn = Array.from(navBtns).find(b => b.dataset.view === v);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      pageTitle.textContent = activeBtn.textContent.trim();
+    }
+
     views.forEach(w => w.classList.add('hidden'));
-    document.getElementById(v).classList.remove('hidden');
-    pageTitle.textContent = b.textContent.trim();
+    const targetView = document.getElementById(v);
+    if (targetView) targetView.classList.remove('hidden');
+
     if (v === 'dashboard') loadDashboard();
-    if (v === 'register')  { loadFormData(); }
+    if (v === 'register')  loadFormData();
     if (v === 'import')    initImportView();
     if (v === 'history')   loadHistory();
     if (v === 'products')  loadProducts();
     if (v === 'clients')   loadClients();
     if (v === 'profile')   loadProfileView();
     updateExportFilteredButton();
+  }
+
+  window.addEventListener('popstate', handleRoute);
+
+  navBtns.forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.view;
+    const routeKey = Object.keys(routes).find(key => routes[key] === v) || 'inicio';
+    navigateTo(routeKey);
   }));
   updateExportFilteredButton();
 
   // ─── NAVEGACIÓN A HISTORIAL DESDE VENTAS RECIENTES ──────
   function navigateToHistory() {
-    // Encontrar el botón de historial
-    const historyBtn = Array.from(navBtns).find(b => b.dataset.view === 'history');
-    if (historyBtn) historyBtn.click();
+    navigateTo('historial');
   }
 
   // ─── CACHÉ GLOBAL ────────────────────────────────────────
@@ -227,6 +345,9 @@ onFirebaseReady(() => {
       // Esperar a que Chart.js esté disponible antes de renderizar gráficos
       await waitForChart();
       loadDashboard();
+
+      // Manejar la ruta inicial al terminar la carga
+      handleRoute();
 
       // Ocultar skeleton screens
       hideSkeletons();
@@ -432,13 +553,88 @@ onFirebaseReady(() => {
 
   // ─── INICIO ───────────────────────────────────────────────
   (async () => {
-    // Usar carga progresiva en lugar de refreshCache
-    await loadDataProgressive();
+    // Eliminamos la llamada inmediata a handleRoute y loadDataProgressive
+    // ya que auth.js se encargará de dispararlas una vez confirmada la sesión.
     initDarkMode();
   })();
 
   // ─── PERFIL ───────────────────────────────────────────────
-  // Funcionalidad de subida de fotos eliminada por requerimiento de diseño estático.
+  /**
+   * Comprime una imagen utilizando el API de Canvas para optimizar el almacenamiento y la carga.
+   * Reduce las dimensiones y ajusta la calidad para obtener un archivo ligero.
+   */
+  async function compressImage(file, { maxWidth = 400, maxHeight = 400, quality = 0.7 } = {}) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Mantener la relación de aspecto
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convertir a Blob (JPEG para mejor compresión de fotos)
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  }
+
+  document.getElementById('profileUpload')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('⚠️ Por favor selecciona una imagen válida', 'warning');
+      return;
+    }
+    // Límite de seguridad para el archivo original (10MB) para evitar cuelgues del navegador
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('⚠️ El archivo original es demasiado grande (máx 10MB)', 'warning');
+      return;
+    }
+
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+
+    showToast('Optimizando y subiendo imagen...', 'info');
+    try {
+      // Comprimimos la imagen a un tamaño máximo de 400x400px con un 70% de calidad
+      const compressedBlob = await compressImage(file, { maxWidth: 400, maxHeight: 400, quality: 0.7 });
+      
+      const ref = storage.ref(`profiles/${user.uid}`);
+      await ref.put(compressedBlob, { contentType: 'image/jpeg' });
+      const url = await ref.getDownloadURL();
+      
+      document.getElementById('profilePhoto').src = url;
+      showToast('✅ Foto optimizada y cargada con éxito', 'success');
+    } catch (err) {
+      console.error('Error subiendo foto:', err);
+      showToast('❌ Error al procesar la imagen', 'error');
+    }
+  });
 
   async function loadProfile() {
     try {
@@ -594,7 +790,7 @@ onFirebaseReady(() => {
     if (confirm('¿Cerrar sesión?')) {
       firebase.auth().signOut().then(() => {
         console.log('✅ Sesión cerrada');
-        window.location.href = window.location.pathname;
+        window.location.href = '/public/login.html';
       }).catch(err => {
         console.error('Error al cerrar sesión:', err);
         showToast('❌ Error al cerrar sesión', 'error');
@@ -1236,9 +1432,11 @@ onFirebaseReady(() => {
   async function loadFormData() {
     if (!clientsCache.length || !productsCache.length) await refreshCache();
     const clientSelect = document.getElementById('clientSelect');
+    if (!clientSelect) return;
+
     clientSelect.innerHTML = clientsCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
     const newSelect = clientSelect.cloneNode(true);
-    clientSelect.parentNode.replaceChild(newSelect, clientSelect);
+    clientSelect.parentNode?.replaceChild(newSelect, clientSelect);
     newSelect.addEventListener('change', async (e) => {
       const clienteId = e.target.value;
       if (clienteId) {
@@ -2388,24 +2586,27 @@ async function registerBatchSales() {
   const previewUpload = document.getElementById('imagePreview');
   const previewImgUpload = document.getElementById('previewImg');
   const uploadMessage = document.getElementById('uploadMessage');
+
   function openUploadModal() {
     if (!productsCache.length) { showToast('Carga los productos primero importando Excel', 'warning'); return; }
-    productSelectUpload.innerHTML = productsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-    imageUrlInputUpload.value = '';
-    previewUpload.classList.add('hidden');
-    uploadMessage.textContent = '';
-    modalUpload.classList.remove('hidden');
+    if (productSelectUpload) productSelectUpload.innerHTML = productsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    if (imageUrlInputUpload) imageUrlInputUpload.value = '';
+    previewUpload?.classList.add('hidden');
+    if (uploadMessage) uploadMessage.textContent = '';
+    modalUpload?.classList.remove('hidden');
   }
-  function closeUploadModal() { modalUpload.classList.add('hidden'); }
-  imageUrlInputUpload.addEventListener('change', () => {
+  function closeUploadModal() { modalUpload?.classList.add('hidden'); }
+
+  imageUrlInputUpload?.addEventListener('change', () => {
     const url = imageUrlInputUpload.value.trim();
-    if (!url) { previewUpload.classList.add('hidden'); return; }
+    if (!url) { previewUpload?.classList.add('hidden'); return; }
     try { new URL(url); } catch { showToast('URL no válida', 'error'); uploadMessage.textContent = 'URL no válida'; uploadMessage.style.color = 'var(--danger)'; previewUpload.classList.add('hidden'); return; }
     previewImgUpload.src = url;
-    previewImgUpload.onload = () => { previewUpload.classList.remove('hidden'); uploadMessage.textContent = ''; };
-    previewImgUpload.onerror = () => { showToast('No se pudo cargar la imagen', 'error'); uploadMessage.textContent = 'No se pudo cargar la imagen'; uploadMessage.style.color = 'var(--danger)'; previewUpload.classList.add('hidden'); };
+    previewImgUpload.onload = () => { previewUpload?.classList.remove('hidden'); uploadMessage.textContent = ''; };
+    previewImgUpload.onerror = () => { showToast('No se pudo cargar la imagen', 'error'); uploadMessage.textContent = 'No se pudo cargar la imagen'; uploadMessage.style.color = 'var(--danger)'; previewUpload?.classList.add('hidden'); };
   });
-  confirmBtnUpload.addEventListener('click', async () => {
+
+  confirmBtnUpload?.addEventListener('click', async () => {
     const url = imageUrlInputUpload.value.trim();
     if (!url) { showToast('Ingresa una URL de imagen', 'warning'); uploadMessage.textContent = 'Ingresa una URL de imagen'; uploadMessage.style.color = 'var(--danger)'; return; }
     const productId = productSelectUpload.value;
@@ -2423,8 +2624,8 @@ async function registerBatchSales() {
     confirmBtnUpload.disabled = false;
   });
   uploadBtn?.addEventListener('click', openUploadModal);
-  closeModalBtn.addEventListener('click', closeUploadModal);
-  cancelBtnUpload.addEventListener('click', closeUploadModal);
+  closeModalBtn?.addEventListener('click', closeUploadModal);
+  cancelBtnUpload?.addEventListener('click', closeUploadModal);
   document.querySelector('#uploadModal .modal-overlay')?.addEventListener('click', closeUploadModal);
 
   // ─── DETALLES DE VENTAS DEL MES, CLIENTES ACTIVOS, ALERTAS ───────

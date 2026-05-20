@@ -2,31 +2,518 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
-  <meta name="description" content="Panel de administración para Farmacéuticos Markos - Gestión de ventas, clientes y productos" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <meta name="description" content="MKS Dashboard - Gestión farmacéutica inteligente en tiempo real" />
   <meta name="theme-color" content="#2563eb" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Farmacéuticos Markos" />
   <link rel="icon" href="favicon.ico" type="image/x-icon" />
-  <meta name="format-detection" content="telephone=no" />
-  <title>MKS DashBoard</title>
+  <title>MKS Dashboard - Plataforma para Farmacéuticos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Estilos base del sistema -->
   <link rel="stylesheet" href="../src/css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-  <script defer src="../src/js/firebase.js"></script>
-  <script defer src="../src/js/performance-optimizer.js"></script>
-  <script defer src="../src/js/auth.js"></script>
-  <script defer src="../src/js/firestore-optimizations.js"></script>
-  <script defer src="../src/js/app.js"></script>
+  
+  <style>
+    :root {
+      --bg-base: #05050f;
+      --bg-surface: #0a0b14;
+      --text-main: #ffffff;
+      --text-muted: #8a8f98;
+      --accent-glow: rgba(0, 240, 255, 0.4);
+      --accent-gradient: linear-gradient(135deg, #00f0ff 0%, #0055ff 100%);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Ambient Glow Background */
+    .ambient-glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      background: var(--accent-gradient);
+      filter: blur(150px);
+      border-radius: 50%;
+      opacity: 0.15;
+      z-index: -1;
+      top: -100px;
+      right: -100px;
+      pointer-events: none;
+    }
+    
+    .ambient-glow-left {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: #0055ff;
+      filter: blur(150px);
+      border-radius: 50%;
+      opacity: 0.1;
+      z-index: -1;
+      bottom: -100px;
+      left: -100px;
+      pointer-events: none;
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 5%;
+      background: rgba(5, 5, 15, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      position: fixed;
+      width: 100%;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .nav-logo img {
+      width: 32px;
+      height: 32px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 30px;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.3s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-main);
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    /* Buttons */
+    .btn-landing {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-main);
+      border: 1px solid var(--glass-border);
+    }
+
+    .btn-outline:hover {
+      background: var(--glass-bg);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 240, 255, 0.6);
+    }
+    
+    .btn-secondary-landing {
+      background: var(--glass-bg);
+      color: var(--text-main);
+      border: 1px solid var(--glass-border);
+    }
+    
+    .btn-secondary-landing:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-2px);
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 5% 60px;
+      position: relative;
+    }
+
+    .hero-container {
+      display: flex;
+      align-items: center;
+      gap: 60px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .hero-content {
+      flex: 1;
+      max-width: 600px;
+      z-index: 2;
+    }
+
+    .badge-landing {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #00f0ff;
+      margin-bottom: 24px;
+    }
+    
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background: #00f0ff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #00f0ff;
+    }
+
+    .hero-title {
+      font-size: 4rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -1px;
+    }
+
+    .text-gradient {
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 50px;
+    }
+
+    .hero-actions .btn-landing {
+      padding: 14px 28px;
+      font-size: 1.05rem;
+    }
+
+    .feature-icons-landing {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .feature-item-landing {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    
+    .feature-item-landing svg {
+      color: #00f0ff;
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Hero Mockup */
+    .hero-visual {
+      flex: 1.2;
+      position: relative;
+      perspective: 1000px;
+    }
+
+    .dashboard-mockup {
+      width: 100%;
+      height: auto;
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent-glow);
+      transform: rotateY(-5deg) rotateX(5deg);
+      transition: transform 0.5s ease;
+      background: var(--bg-surface);
+      display: block;
+    }
+
+    .hero-visual:hover .dashboard-mockup {
+      transform: rotateY(0deg) rotateX(0deg);
+    }
+
+    /* Features Section */
+    .features-landing {
+      padding: 100px 5%;
+      background: var(--bg-surface);
+      position: relative;
+      z-index: 2;
+    }
+
+    .features-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 60px;
+    }
+
+    .features-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .features-subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .feature-card-landing {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 40px 30px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .feature-card-landing::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--accent-gradient);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .feature-card-landing:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .feature-card-landing:hover::before {
+      opacity: 1;
+    }
+
+    .feature-screenshot {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      object-position: top;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      border: 1px solid var(--glass-border);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
+      background: var(--bg-surface);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .feature-card-landing:hover .feature-screenshot {
+      transform: scale(1.08) translateY(-12px) rotate(1deg);
+      box-shadow: 0 20px 40px rgba(0, 240, 255, 0.25);
+      border-color: rgba(0, 240, 255, 0.5);
+    }
+
+    .feature-card-landing h3 {
+      font-size: 1.3rem;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .feature-card-landing p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    .footer-landing {
+      padding: 40px 5%;
+      text-align: center;
+      border-top: 1px solid var(--glass-border);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 992px) {
+      .hero-container {
+        flex-direction: column;
+        text-align: center;
+        gap: 40px;
+      }
+      .hero-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .hero-title {
+        font-size: 3rem;
+      }
+      .hero-visual {
+        width: 100%;
+      }
+      .dashboard-mockup {
+        transform: none;
+      }
+      .nav-links {
+        display: none;
+      }
+    }
+
+    /* Animated Tech Lines Background (AI Interface Style) */
+    .animated-lines {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(5, 5, 15, 0) 0%, var(--bg-base) 100%);
+    }
+
+    .animated-lines::before {
+      content: "";
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      top: -50%;
+      left: -50%;
+      /* Grid + Puntos en las intersecciones */
+      background-image: 
+        radial-gradient(rgba(0, 240, 255, 0.15) 1.5px, transparent 1.5px),
+        linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+      background-size: 80px 80px, 80px 80px, 80px 80px;
+      background-position: center center;
+      animation: moveGrid 20s linear infinite;
+      mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
+    }
+
+    @keyframes moveGrid {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(-80px, -80px); }
+    }
+
+    .animated-lines::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      /* Glow central cian/azul */
+      background: radial-gradient(circle at center, rgba(0, 240, 255, 0.08), rgba(0, 85, 255, 0.05) 50%, transparent 70%);
+      filter: blur(80px);
+      animation: pulseGlow 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { opacity: 0.5; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Efecto de destellos aleatorios en los puntos */
+    .sparkles {
+      position: absolute;
+      inset: -100px;
+      background-image: radial-gradient(circle at center, rgba(0, 240, 255, 0.8) 1.5px, transparent 2.5px);
+      background-size: 240px 240px; /* Tamaño asimétrico respecto al grid base de 80px */
+      animation: moveGrid 15s linear infinite reverse, twinkle 5s infinite ease-in-out;
+      filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.3); }
+      50% { opacity: 0.8; transform: scale(1.5); }
+    }
+
+    /* Línea de escaneo láser vertical (barrido horizontal) */
+    .scan-line-v {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, transparent, #00f0ff, #0055ff, transparent);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.8);
+      opacity: 0;
+      z-index: 1;
+      animation: scanV 10s linear infinite;
+    }
+
+    @keyframes scanV {
+      0% { left: -1%; opacity: 0; }
+      1% { opacity: 0.6; }
+      15% { opacity: 0.6; }
+      20% { left: 101%; opacity: 0; }
+      100% { left: 101%; opacity: 0; }
+    }
+  </style>
+
   <script defer src="../src/js/mobile-optimizations.js"></script>
+  <script>window.addEventListener('load', () => document.getElementById('splashScreen')?.classList.add('hidden'));</script>
 </head>
 <body>
   <!-- Pantalla de Carga -->
@@ -35,476 +522,520 @@
     <img src="assets/mks.png" alt="MKS" class="splash-logo">
   </div>
 
-  <!-- Sección de Autenticación -->
-  <section id="authView" class="view">
-    <div class="auth-split-wrapper">
-      <!-- Lado Izquierdo: Branding y Frase Pro -->
-      <div class="auth-branding-side">
-        <div class="branding-content">
-          <div class="animated-logo-container">
-            <img src="assets/mks.png" alt="MKS Logo" class="premium-logo">
-            <div class="logo-glow"></div>
+  <div class="ambient-glow"></div>
+  <div class="ambient-glow-left"></div>
+  <div class="animated-lines" id="techGrid">
+    <div class="sparkles"></div>
+    <div class="scan-line-v"></div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-logo" onclick="window.location.href='/public/index.html'">
+      <img src="assets/mks.png" alt="MKS Logo" onerror="this.style.display='none'">
+      MKS Dashboard
+    </div>
+    <div class="nav-links">
+      <a href="#">Inicio</a>
+      <a href="#features">Características</a>
+      <a href="#details">Explora</a>
+      <a href="#contact">Contacto</a>
+      <a href="#privacy">Privacidad</a>
+      <a href="#terms">Términos</a>
+    </div>
+    <div class="nav-actions">
+      <a href="/public/login.html" class="btn-landing btn-outline">Iniciar sesión</a>
+      <a href="/public/login.html" class="btn-landing btn-primary">Comenzar</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="badge-landing">
+          <div class="badge-dot"></div>
+          Plataforma para farmacéuticos
+        </div>
+        <h1 class="hero-title">
+          Gestiona tu negocio farmacéutico en <span class="text-gradient">tiempo real</span>
+        </h1>
+        <p class="hero-subtitle">
+          Controla ventas, clientes, productos y más desde una sola plataforma inteligente y fácil de usar.
+        </p>
+        <div class="hero-actions">
+          <a href="/public/login.html" class="btn-landing btn-primary">Comienza ahora</a>
+          <button class="btn-landing btn-secondary-landing" onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})">Conoce más</button>
+        </div>
+        <div class="feature-icons-landing">
+          <div class="feature-item-landing">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Ventas en tiempo real
           </div>
-          <h1 class="branding-title">Gestiona tu negocio <br><span>en tiempo real.</span></h1>
-          <p class="branding-subtitle">La plataforma inteligente para el control de Farmacéuticos Markos.</p>
-          <div class="branding-graphic">
-            <div class="mockup-dashboard">
-              <div class="mockup-line"></div>
-              <div class="mockup-line short"></div>
-            </div>
+          <div class="feature-item-landing">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Control de clientes y productos
+          </div>
+          <div class="feature-item-landing">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Reportes inteligentes
+          </div>
+          <div class="feature-item-landing">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Acceso seguro
           </div>
         </div>
       </div>
+      <div class="hero-visual">
+        <img src="assets/dashboard.png" alt="MKS Dashboard Preview" class="dashboard-mockup" onerror="this.src='https://placehold.co/1200x800/0a0b14/ffffff?text=Dashboard+Preview'">
+      </div>
+    </div>
+  </section>
 
-      <!-- Lado Derecho: Formulario Refinado -->
-      <div class="auth-form-side">
-        <div class="auth-card-premium">
-          <h2 id="authTitle">Bienvenido</h2>
-          <p class="auth-card-subtitle">Ingresa tus credenciales para continuar</p>
-          
-          <form id="loginForm">
-            <!-- Campos de registro optimizados -->
-            <div id="registerExtraFields" class="hidden registration-grid">
-              <div class="input-group-premium"><input type="text" id="regNombre"><label>Nombre</label></div>
-              <div class="input-group-premium"><input type="text" id="regApellido"><label>Apellido</label></div>
-              <div class="input-group-premium full"><input type="date" id="regBirth"><label>Fecha de Nacimiento</label></div>
-              <div class="input-group-premium"><input type="tel" id="regTel"><label>Celular</label></div>
-              <div class="input-group-premium"><input type="text" id="regDni" maxlength="8"><label>DNI</label></div>
-            </div>
+  <!-- Features Section -->
+  <section id="features" class="features-landing">
+    <div class="features-header">
+      <h2 class="features-title">Todo lo que necesitas para tu farmacia</h2>
+      <p class="features-subtitle">Herramientas diseñadas específicamente para optimizar la gestión de tu negocio farmacéutico.</p>
+    </div>
+    
+    <div class="features-grid">
+      <div class="feature-card-landing card-sales">
+        <div class="feature-icon-box">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        </div>
+        <h3>Gestión de ventas</h3>
+        <p>Registro masivo de productos con control estricto de lotes y bonificaciones en una sola transacción rápida.</p>
+      </div>
 
-            <div class="input-group-premium">
-              <input type="email" id="authEmail" required>
-              <label>Correo electrónico</label>
-            </div>
-            
-            <div class="input-group-premium">
-              <input type="password" id="authPassword" required>
-              <label>Contraseña</label>
-            </div>
-            
-            <div class="auth-options">
-              <label class="show-pass-label">
-                <input type="checkbox" id="showPassToggle">
-                <span>Mostrar contraseña</span>
-              </label>
-            </div>
+      <div class="feature-card-landing card-stock">
+        <div class="feature-icon-box">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        </div>
+        <h3>Stock y Catálogo</h3>
+        <p>Gestión centralizada de precios VVF/PVF y márgenes con visualización de inventario siempre sincronizada.</p>
+      </div>
 
-            <button type="submit" id="btnAuthMain" class="btn-premium primary-gradient">
-              <span class="btn-text">Entrar al Panel</span>
-              <div class="btn-loader hidden"></div>
-            </button>
-          </form>
+      <div class="feature-card-landing card-history">
+        <div class="feature-icon-box">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </div>
+        <h3>Historial Potente</h3>
+        <p>Análisis de movimientos con filtros avanzados por fecha o cliente y exportación rápida de reportes a Excel.</p>
+      </div>
 
-          <div class="auth-separator">
-            <span>o continúa con</span>
+      <div class="feature-card-landing card-clients">
+        <div class="feature-icon-box">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <h3>Panel Clientes</h3>
+        <p>Control de fidelidad y actividad para detectar fugas de clientes y estimar fechas de próxima recompra.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sección detallada con pestañas interactivas -->
+  <section id="details" class="details-section">
+    <div class="details-container">
+      <div class="details-header">
+        <h2>Explora cada módulo en profundidad</h2>
+        <p>Descubre cómo MKS Dashboard transforma cada área de tu negocio</p>
+      </div>
+
+      <!-- Pestañas -->
+      <div class="details-tabs">
+        <button class="tab-btn active" data-tab="ventas">💊 Ventas</button>
+        <button class="tab-btn" data-tab="productos">📦 Productos</button>
+        <button class="tab-btn" data-tab="historial">📊 Historial</button>
+        <button class="tab-btn" data-tab="clientes">👥 Clientes</button>
+      </div>
+
+      <!-- Contenido de cada pestaña -->
+      <div class="details-content">
+        <!-- Ventas -->
+        <div class="detail-panel active" id="tab-ventas">
+          <div class="detail-image">
+            <img src="assets/ventas.png" alt="Módulo Ventas" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Ventas+Mockup'">
           </div>
+          <div class="detail-text">
+            <h3>Gestión de Ventas <span class="badge-new">Nuevo</span></h3>
+            <p>Optimiza cada transacción con herramientas diseñadas para farmacias y distribuidoras.</p>
+            <ul class="detail-list">
+              <li>Registro múltiple de productos en una sola venta</li>
+              <li>Control de lote, fecha de vencimiento y cantidad</li>
+              <li>Precios personalizados por cliente (calculador automático VVF/PVF)</li>
+              <li>Bonificaciones con un solo clic (precio 0)</li>
+              <li>Vista previa de imágenes de productos</li>
+            </ul>
+          </div>
+        </div>
 
-          <button id="btnGoogleAuth" class="btn-premium google-white">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
-            Google
-          </button>
+        <!-- Productos -->
+        <div class="detail-panel" id="tab-productos">
+          <div class="detail-image">
+            <img src="assets/productos.png" alt="Módulo Productos" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Productos+Mockup'">
+          </div>
+          <div class="detail-text">
+            <h3>Catálogo Inteligente</h3>
+            <p>Centraliza todos tus productos con precios dinámicos y actualización en tiempo real.</p>
+            <ul class="detail-list">
+              <li>Importación/exportación masiva desde Excel</li>
+              <li>Cálculo automático de PVF a partir de VVF + descuento</li>
+              <li>Galería de imágenes por producto</li>
+              <li>Búsqueda rápida por nombre o presentación</li>
+              <li>Control de stock y alertas de vencimiento</li>
+            </ul>
+          </div>
+        </div>
 
-          <p class="auth-switch">
-            ¿No tienes cuenta? <a href="#" id="switchToRegister">Regístrate ahora</a>
-          </p>
+        <!-- Historial -->
+        <div class="detail-panel" id="tab-historial">
+          <div class="detail-image">
+            <img src="assets/historial.png" alt="Módulo Historial" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Historial+Mockup'">
+          </div>
+          <div class="detail-text">
+            <h3>Historial Avanzado</h3>
+            <p>Analiza todas tus transacciones con filtros potentes y visualización clara.</p>
+            <ul class="detail-list">
+              <li>Filtros por fecha, cliente, producto, lote y vencimiento</li>
+              <li>Agrupación automática por cliente (secciones colapsables)</li>
+              <li>Exportación a Excel con un clic</li>
+              <li>Edición y eliminación de ventas directamente desde la tabla</li>
+              <li>Vista detallada de cada transacción</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Clientes -->
+        <div class="detail-panel" id="tab-clientes">
+          <div class="detail-image">
+            <img src="assets/clientes.png" alt="Módulo Clientes" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Clientes+Mockup'">
+          </div>
+          <div class="detail-text">
+            <h3>Panel de Clientes</h3>
+            <p>Conoce a fondo el comportamiento de compra de tus clientes y fidelízalos.</p>
+            <ul class="detail-list">
+              <li>Perfil completo con RUC, contacto, dirección y logo</li>
+              <li>Historial de compras y montos acumulados</li>
+              <li>Indicadores de actividad (última compra, frecuencia)</li>
+              <li>Estimación de próxima recompra basada en historial real</li>
+              <li>Exportación e importación de lista de clientes desde Excel</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <div id="appView" class="app hidden">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="brand-wrap">
-        <img src="assets/mks.png" alt="MKS Logo" class="brand-logo" />
-        <div class="brand-text">
-          <span class="brand-name">MKS</span>
-          <span class="brand-markos">DashBoard</span>
-        </div>
+  <style>
+    /* Media Queries específicas para el Grid de Características */
+    @media (max-width: 1024px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 768px) {
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      .feature-card-landing {
+        padding: 32px 24px;
+      }
+    }
+
+    /* Sección detallada con pestañas */
+    .details-section {
+      padding: 80px 5%;
+      background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-base) 100%);
+      position: relative;
+      z-index: 2;
+    }
+
+    .details-container {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .details-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .details-header h2 {
+      font-size: 2.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #00f0ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 16px;
+    }
+
+    .details-header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    /* Pestañas */
+    .details-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 50px;
+    }
+
+    .tab-btn {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      padding: 12px 28px;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .tab-btn:hover {
+      background: rgba(0, 240, 255, 0.1);
+      border-color: #00f0ff;
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #00f0ff, #0055ff);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+    }
+
+    /* Contenido de pestañas */
+    .details-content {
+      position: relative;
+      min-height: 450px;
+    }
+
+    .detail-panel {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      align-items: center;
+      animation: fadeSlideUp 0.5s ease forwards;
+    }
+
+    .detail-panel.active {
+      display: grid;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .detail-image {
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 240, 255, 0.1);
+      transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    .detail-image:hover {
+      transform: scale(1.02);
+      box-shadow: 0 30px 50px rgba(0, 240, 255, 0.2);
+    }
+
+    .detail-image img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 20px;
+    }
+
+    .detail-text h3 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff, #00f0ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .badge-new {
+      font-size: 0.8rem;
+      background: rgba(0, 240, 255, 0.2);
+      color: #00f0ff;
+      padding: 4px 12px;
+      border-radius: 50px;
+      margin-left: 12px;
+      vertical-align: middle;
+    }
+
+    .detail-text p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .detail-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .detail-list li {
+      font-size: 1rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .detail-list li::before {
+      content: "▹";
+      color: #00f0ff;
+      font-size: 1.2rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+      .detail-panel { grid-template-columns: 1fr; gap: 30px; text-align: center; }
+      .detail-list li { justify-content: center; }
+      .detail-text h3 { font-size: 1.5rem; }
+      .details-header h2 { font-size: 1.8rem; }
+    }
+
+    @media (max-width: 768px) {
+      .details-section { padding: 50px 5%; }
+      .tab-btn { padding: 8px 18px; font-size: 0.85rem; }
+      .detail-text p { font-size: 1rem; }
+    }
+
+    /* Contact and Legal Styles */
+    .contact-section, .legal-section {
+      padding: 100px 5%;
+      max-width: 1300px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .contact-grid {
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+    .contact-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 18px 30px;
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      font-weight: 600;
+    }
+    .contact-link:hover {
+      border-color: #00f0ff;
+      background: rgba(0, 240, 255, 0.05);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 240, 255, 0.15);
+    }
+    .legal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 60px;
+    }
+    @media (max-width: 992px) { .legal-grid { grid-template-columns: 1fr; } }
+    .legal-card {
+      background: rgba(255, 255, 255, 0.02);
+      padding: 40px;
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      text-align: left;
+    }
+    .legal-card h3 { font-size: 1.5rem; margin-bottom: 20px; color: #fff; }
+    .legal-card p { color: var(--text-muted); line-height: 1.8; }
+  </style>
+
+  <!-- Sección de Contacto -->
+  <section id="contact" class="contact-section">
+    <h2 class="features-title">Hablemos</h2>
+    <p class="features-subtitle">¿Tienes alguna duda o necesitas soporte personalizado? Estamos aquí para ayudarte.</p>
+    <div class="contact-grid">
+      <a href="https://wa.me/51918605351" target="_blank" class="contact-link">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.347-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.13-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.307-.24-.679-.481-.588-.67-.588-.174 0-.373-.021-.573-.021-.198 0-.522.074-.796.373-.273.3-.374 0-1.043.6-.669.6-2.008 1.564-2.008 3.812 0 2.247 1.636 4.417 1.859 4.715.222.299 3.221 4.923 7.803 6.902 1.091.47 1.943.75 2.603.959 1.096.348 2.095.3 2.885.182.88-.132 1.758-.718 2.007-1.378.25-.66.25-1.226.175-1.378-.076-.15-.275-.224-.573-.373zM12 2.031c-5.502 0-9.969 4.467-9.969 9.969 0 2.126.701 4.095 1.892 5.688L2.031 22.5l5.012-1.831c1.511.821 3.223 1.285 5.045 1.285 5.502 0 9.969-4.467 9.969-9.969 0-5.502-4.467-9.969-9.969-9.969z"/></svg>
+        WhatsApp
+      </a>
+      <a href="mailto:ismazr.dev@gmail.com" class="contact-link">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        Email
+      </a>
+      <a href="https://www.linkedin.com/in/ismael-zamora/" target="_blank" class="contact-link">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+        LinkedIn
+      </a>
+    </div>
+  </section>
+
+  <!-- Sección Legal -->
+  <section class="legal-section">
+    <div class="legal-grid">
+      <div id="privacy" class="legal-card">
+        <h3>Política de privacidad</h3>
+        <p>En MKS Dashboard, tu privacidad es nuestra prioridad absoluta. Toda la información registrada en el sistema —desde inventarios hasta datos de clientes— está protegida por protocolos de cifrado de alta seguridad. No compartimos tus datos con terceros y garantizamos que la información se utiliza exclusivamente para optimizar la gestión de tu farmacia y proporcionarte métricas precisas en tiempo real.</p>
       </div>
-      <nav>
-        <button data-view="dashboard" class="nav-btn active"><span class="nav-icon">🏠</span> Inicio</button>
-        <button data-view="register" class="nav-btn"><span class="nav-icon">➕</span> Registrar Venta</button>
-        <button data-view="history" class="nav-btn"><span class="nav-icon">📋</span> Historial</button>
-        <button data-view="clients" class="nav-btn"><span class="nav-icon">👥</span> Clientes</button>
-        <button data-view="products" class="nav-btn"><span class="nav-icon">💊</span> Productos</button>
-        <button data-view="import" class="nav-btn"><span class="nav-icon">📥</span> Importar Excel</button>
+      <div id="terms" class="legal-card">
+        <h3>Términos de uso</h3>
+        <p>El uso de la plataforma MKS Dashboard implica la aceptación de nuestras condiciones de servicio. Proporcionamos una herramienta avanzada para la administración farmacéutica; el usuario es el único responsable de la integridad de los datos ingresados y del cumplimiento de las normativas locales vigentes. Nos reservamos el derecho de actualizar nuestras herramientas para garantizar siempre el mejor rendimiento y seguridad.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer-landing">
+    <p>&copy; 2026 MKS Dashboard. Todos los derechos reservados.</p>
+  </footer>
+
+  <script>
+    // Efecto Parallax suave para la cuadrícula tecnológica
+    document.addEventListener('mousemove', (e) => {
+      const grid = document.getElementById('techGrid');
+      if (!grid) return;
+      const x = (e.clientX / window.innerWidth - 0.5) * 25;
+      const y = (e.clientY / window.innerHeight - 0.5) * 25;
+      grid.style.transform = `translate(${x}px, ${y}px)`;
+    });
+
+    // Control de pestañas en la sección detallada
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.detail-panel');
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.dataset.tab;
         
-        <!-- Mi Perfil -->
-        <button data-view="profile" class="nav-btn" style="margin-top: auto; border-top: 1px solid var(--border); border-radius: 0;"><span class="nav-icon">👤</span> Mi Perfil</button>
-
-        <!-- Switch de Modo Oscuro -->
-        <div class="theme-switch-nav" style="padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border);">
-          <div class="nav-icon" id="darkModeIcon">🌙</div>
-          <span id="darkModeText" style="font-size: 13px; font-weight: 600; flex: 1; color: var(--muted);">Modo Oscuro</span>
-          <label class="theme-switch" for="darkModeToggle">
-            <input type="checkbox" id="darkModeToggle" />
-            <div class="slider round"></div>
-          </label>
-        </div>
-        <!-- Reloj / Ubicación -->
-        <div style="padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; border-bottom: none;">
-          <div id="clockLocation">Detectando ubicación...</div>
-          <div style="font-size: 14px; font-weight: bold; margin: 4px 0; color: var(--text); font-variant-numeric: tabular-nums;" id="clockDisplay">--:--:--</div>
-          <div id="clockDate">--</div>
-        </div>
-      </nav>
-    </aside>
-
-    <!-- MAIN -->
-    <main class="main">
-      <header class="topbar">
-        <div class="topbar-left">
-          <img src="assets/mks.png" alt="MKS" class="topbar-mobile-logo" />
-          <img src="https://www.laboratoriosmarkos.com/public/front/images/lfm-1315x333.png" alt="Markos" class="topbar-logo" />
-          <div>
-            <h1 id="pageTitle">Inicio</h1>
-            <p class="subtitle" id="subtitleWelcome">Bienvenida, Usuario · Farmacéuticos Markos</p>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <button id="exportFilteredBtn" class="btn secondary" style="background: #e2e8f0; display: none;">📄 Exportar filtrados</button>
-        </div>
-        <div class="profile">
-          <div class="avatar-wrap">
-            <img id="profileImg" src="" alt="Perfil" class="avatar" />
-          </div>
-          <button id="logoutBtn" class="btn-logout" title="Cerrar sesión">⏻</button>
-        </div>
-      </header>
-
-      <!-- DASHBOARD -->
-      <section id="dashboard" class="view">
-        <div class="dashboard-grid">
-          <div class="dashboard-main">
-            <div class="kpi-row">
-              <div class="kpi-card primary" style="position: relative;">
-                <button class="detail-eye-btn" id="viewVentasDetail" title="Ver detalle de ventas del mes">👁️</button>
-                <div class="kpi-label">Ventas del mes</div>
-                <div id="totalMonth" class="kpi-value">S/0.00</div>
-              </div>
-              <div class="kpi-card" style="position: relative;">
-                <button class="detail-eye-btn" id="viewClientesActivosDetail" title="Ver clientes activos">👁️</button>
-                <div class="kpi-label">Clientes activos</div>
-                <div id="activeClients" class="kpi-value">0</div>
-                <div class="kpi-sub">compraron en los últimos 30 días</div>
-              </div>
-              <div class="kpi-card warn-card" style="position: relative;">
-                <button class="detail-eye-btn" id="viewAlertasDetail" title="Ver alertas activas">👁️</button>
-                <div class="kpi-label">Alertas activas</div>
-                <div id="alertsCount" class="kpi-value">0</div>
-                <div class="kpi-sub">requieren atención</div>
-              </div>
-            </div>
-            <div class="section-card">
-              <div class="section-header"><div class="section-title">📈 Tendencia de ventas</div></div>
-              <canvas id="salesChart" style="max-height: 250px; width: 100%;"></canvas>
-            </div>
-            <div class="section-card" id="topClientsSection" style="cursor: pointer; transition: all 0.3s ease;"><div class="section-header"><div class="section-title">🏆 Top 5 clientes (ventas totales)</div></div><canvas id="topClientsChart" style="max-height: 280px; width: 100%;"></canvas></div>
-          </div>
-          <aside class="dashboard-side">
-            <div class="section-card quota-card" style="margin-bottom: 20px;">
-              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <div class="section-title" style="display: flex; align-items: center; gap: 8px;">📊 Meta
-                  <div class="quota-type-toggle">
-                    <button id="setQuotaCircle" class="btn-icon" style="padding: 2px 4px; font-size: 10px;" title="Gráfico Circular">⭕</button>
-                    <button id="setQuotaBar" class="btn-icon" style="padding: 2px 4px; font-size: 10px;" title="Barra de Progreso">📊</button>
-                  </div>
-                </div>
-                <button id="editQuotaBtn" class="btn secondary" style="padding: 4px 8px; font-size: 11px;">✏️ Editar</button>
-              </div>
-              <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; cursor: pointer;" id="quotaChartSection" title="Click para ver gráfico expandido">
-                <div style="flex: 0 0 120px; height: 120px;">
-                  <canvas id="quotaChart" style="max-height: 120px; width: 100%;"></canvas>
-                </div>
-                <div id="quotaStats" style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
-                  <div class="quota-stat" style="padding: 8px;">
-                    <div class="quota-stat-label" style="font-size: 10px;">Meta</div>
-                    <div id="quotaMetaValue" class="quota-stat-value" style="font-size: 14px;">S/0.00</div>
-                  </div>
-                  <div class="quota-stat" style="padding: 8px;">
-                    <div class="quota-stat-label" style="font-size: 10px;">Realizado</div>
-                    <div id="quotaSalesValue" class="quota-stat-value" style="font-size: 14px;">S/0.00</div>
-                  </div>
-                  <div class="quota-stat" style="padding: 8px;">
-                    <div class="quota-stat-label" style="font-size: 10px;">Progreso</div>
-                    <div id="quotaProgressValue" class="quota-stat-value quota-progress-text" style="font-size: 14px;">0%</div>
-                  </div>
-                </div>
-              </div>
-              <div id="quotaEditForm" style="display: none; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap;">
-                  <label style="flex: 1; min-width: 120px;">
-                    <span style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 3px;">Cuota (S/)</span>
-                    <input id="quotaInput" type="number" class="form-control" placeholder="Ej: 250000" min="0" step="100" style="font-size: 12px; padding: 6px;">
-                  </label>
-                  <button id="saveQuotaBtn" class="btn primary" style="padding: 6px 10px; font-size: 11px;">Guardar</button>
-                  <button id="cancelQuotaBtn" class="btn secondary" style="padding: 6px 10px; font-size: 11px;">Cancelar</button>
-                </div>
-              </div>
-            </div>
-            <div class="section-card"><div class="section-header"><div class="section-title">⭐ Top 3 productos destacados</div></div><div id="featuredProducts" class="featured-list"></div></div>
-            <div class="section-card"><div class="section-header"><div class="section-title">🕘 Ventas recientes</div></div><ul id="recentSales" class="recent-sales-list"></ul></div>
-            <div class="section-card" id="recomprasSection" style="cursor: pointer;"><div class="section-header"><div class="section-title">🔄 Próximas recompras estimadas</div></div><div id="recomprasGrid" class="recompras-grid"></div></div>
-            <div class="section-card"><div id="clockWidget" class="clock-widget"><div class="clock-header" id="clockLocation">Detectando ubicación...</div><div class="clock-display" id="clockDisplay">--:--:--</div><div class="clock-date" id="clockDate">--</div></div></div>
-          </aside>
-        </div>
-      </section>
-
-      <!-- MODALES DE DETALLE PROFESIONALES -->
-      <div id="detailVentasModal" class="modal pro-modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content pro-modal-content">
-          <div class="modal-header pro-modal-header">
-            <h3>📊 Detalle de Ventas del Mes</h3>
-            <button class="modal-close" id="closeVentasModal">&times;</button>
-          </div>
-          <div class="modal-body pro-modal-body">
-            <div class="pro-summary-card">
-              <div class="pro-summary-item"><span class="pro-summary-label">Mes actual</span><span class="pro-summary-value" id="ventasMesLabel">-</span></div>
-              <div class="pro-summary-item"><span class="pro-summary-label">Total ventas</span><span class="pro-summary-value" id="ventasTotalGeneral">S/0.00</span></div>
-              <div class="pro-summary-item"><span class="pro-summary-label">Transacciones</span><span class="pro-summary-value" id="ventasCount">0</span></div>
-            </div>
-            <div class="pro-table-wrapper"><table class="pro-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Precio Unit.</th><th>Total</th><th>Fecha</th></tr></thead><tbody id="ventasDetalleTable"></tbody></table></div>
-          </div>
-          <div class="modal-footer pro-modal-footer"><button id="closeVentasModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
-        </div>
-      </div>
-      <div id="detailClientesActivosModal" class="modal pro-modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content pro-modal-content">
-          <div class="modal-header pro-modal-header"><h3>👥 Clientes Activos (últimos 30 días)</h3><button class="modal-close" id="closeClientesActivosModal">&times;</button></div>
-          <div class="modal-body pro-modal-body"><div class="pro-table-wrapper"><table class="pro-table"><thead><tr><th>Cliente</th><th>Última compra</th><th>Compras (30d)</th><th>Monto (30d)</th></tr></thead><tbody id="clientesActivosTable"></tbody></table></div></div>
-          <div class="modal-footer pro-modal-footer"><button id="closeClientesActivosModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
-        </div>
-      </div>
-      <div id="detailAlertasModal" class="modal pro-modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content pro-modal-content">
-          <div class="modal-header pro-modal-header"><h3>⚠️ Alertas Activas</h3><button class="modal-close" id="closeAlertasModal">&times;</button></div>
-          <div class="modal-body pro-modal-body"><div class="alerts-grid"><div class="alert-card warning-card"><div class="alert-card-header">⚠️ Advertencias</div><ul id="modalWarningList" class="alert-list-custom"></ul></div><div class="alert-card danger-card"><div class="alert-card-header">🔴 Urgentes</div><ul id="modalDangerList" class="alert-list-custom"></ul></div></div></div>
-          <div class="modal-footer pro-modal-footer"><button id="closeAlertasModalBtn" class="btn pro-btn-secondary">Cerrar</button></div>
-        </div>
-      </div>
-
-      <!-- REGISTRAR VENTA MÚLTIPLE con búsqueda -->
-      <section id="register" class="view hidden">
-        <div class="form-card" style="max-width: 100%;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 class="form-title" style="margin-bottom: 0;">Registrar Venta Múltiple</h2>
-            <div class="form-actions">
-              <button id="registerBatchBtn" type="button" class="btn primary" style="margin: 0;">Registrar ventas seleccionadas</button>
-              <span id="batchMessage" class="form-message"></span>
-            </div>
-          </div>
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <label class="form-label">Cliente
-              <select id="clientSelect" class="form-control"></select>
-            </label>
-            <label class="form-label">🔍 Buscar producto
-              <input type="text" id="productSearchRegister" class="form-control" placeholder="Nombre o presentación...">
-            </label>
-          </div>
-          <div id="productTableContainer" style="margin-top: 20px; overflow-x: auto; width: 100%;">
-            <table class="table" id="salesBatchTable" style="min-width: 1000px; width: 100%; white-space: nowrap;">
-              <thead><tr><th>Imagen</th><th>Producto</th><th>Presentación</th><th>Precio (S/)</th><th>Cantidad</th><th>Lote</th><th>Vencimiento</th><th>Seleccionar</th></tr></thead>
-              <tbody id="batchTableBody"><tr><td colspan="8" class="muted" style="text-align:center;">Selecciona un cliente para ver sus productos</td</tr></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- HISTORIAL CON FILTROS AVANZADOS -->
-      <section id="history" class="view hidden">
-        <div class="table-card">
-          <div class="table-header">
-            <h2 class="form-title">Historial de Ventas</h2>
-            <button class="btn secondary" id="toggleFiltersBtn" style="padding: 6px 12px; font-size:12px;">🔍 Mostrar filtros</button>
-          </div>
-          <div id="advancedFilters" class="advanced-filters hidden">
-            <div class="filter-row">
-              <div class="filter-group">
-                <label>Fecha desde</label>
-                <input type="date" id="filterFechaDesde" class="filter-input">
-              </div>
-              <div class="filter-group">
-                <label>Fecha hasta</label>
-                <input type="date" id="filterFechaHasta" class="filter-input">
-              </div>
-              <div class="filter-group">
-                <label>Cliente</label>
-                <input type="text" id="filterCliente" class="filter-input" placeholder="Nombre o parte">
-              </div>
-              <div class="filter-group">
-                <label>Producto</label>
-                <input type="text" id="filterProducto" class="filter-input" placeholder="Nombre o parte">
-              </div>
-            </div>
-            <div class="filter-row">
-              <div class="filter-group">
-                <label>Lote</label>
-                <input type="text" id="filterLote" class="filter-input" placeholder="Número de lote">
-              </div>
-              <div class="filter-group">
-                <label>Vencimiento desde</label>
-                <input type="date" id="filterVenceDesde" class="filter-input">
-              </div>
-              <div class="filter-group">
-                <label>Vencimiento hasta</label>
-                <input type="date" id="filterVenceHasta" class="filter-input">
-              </div>
-              <div class="filter-group">
-                <button id="applyFiltersBtn" class="btn primary" style="margin-top: 22px;">Aplicar filtros</button>
-                <button id="clearFiltersBtn" class="btn secondary" style="margin-top: 22px;">Limpiar</button>
-              </div>
-            </div>
-          </div>
-          <div class="table-wrap"><table class="table" id="historyTable"><thead><tr><th>Cliente</th><th>Producto</th><th>Fecha venta</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th><th>Lote</th><th>Vencimiento</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
-        </div>
-      </section>
-
-      <!-- CLIENTES -->
-      <section id="clients" class="view hidden">
-        <div class="section-card">
-          <div class="products-header">
-            <h2 class="form-title">Clientes</h2>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button id="importClientsBtn" class="btn secondary" style="background: #e2e8f0;">📥 Importar Excel</button>
-              <button id="exportClientsBtn" class="btn secondary" style="background: #e2e8f0;">📄 Exportar Excel</button>
-              <button id="addClientBtn" class="btn primary">➕ Nuevo Cliente</button>
-            </div>
-            <input type="file" id="importClientsInput" accept=".xlsx, .xls" class="hidden" />
-          </div>
-          <div id="clientsGrid" class="clients-grid"></div>
-        </div>
-      </section>
-
-      <!-- PRODUCTOS -->
-      <section id="products" class="view hidden">
-        <div class="section-card">
-          <div class="products-header">
-            <h2 class="form-title">Productos</h2>
-            <div style="display: flex; gap: 10px;">
-              <button id="importProductsBtn" class="btn secondary" style="background: #e2e8f0;">📥 Importar</button>
-              <button id="exportProductsBtn" class="btn secondary" style="background: #e2e8f0;">📄 Exportar</button>
-              <input type="text" id="productSearchInput" class="filter-input" placeholder="🔍 Buscar producto..." style="width: 200px;">
-              <button id="addProductBtn" class="btn primary">➕ Nuevo Producto</button>
-            </div>
-          </div>
-          <input type="file" id="importProductsInput" accept=".xlsx, .xls" class="hidden" />
-          <div id="productsGrid" class="products-grid"></div>
-        </div>
-      </section>
-
-      <!-- IMPORTAR EXCEL (con botón Exportar todo) -->
-      <section id="import" class="view hidden">
-        <div class="form-card">
-          <h2 class="form-title">Importar Excel</h2>
-          <p class="muted">El archivo debe tener una columna <strong>PRODUCTO</strong>, columnas VVF/PVF, y una columna por cada cliente con sus precios personalizados.</p>
-          <label class="form-label" style="margin-top:16px">Archivo Excel (.xlsx / .xls)
-            <input id="excelFile" type="file" accept=".xlsx,.xls" class="form-control" />
-          </label>
-          <div class="import-progress">
-            <div class="import-progress-header">
-              <span id="importStage" class="muted">Esperando archivo…</span>
-              <span id="importPercent" class="muted">0%</span>
-            </div>
-            <div class="import-bar-wrap">
-              <div id="importProgressFill" class="import-bar-fill" style="width:0%"></div>
-            </div>
-            <div id="importDetail" class="muted import-detail">Selecciona un archivo para comenzar.</div>
-          </div>
-          <div class="form-actions" style="flex-wrap: wrap; gap: 12px;">
-            <button id="importExcelBtn" type="button" class="btn primary">📂 Importar archivo</button>
-            <button id="exportAllBtn" type="button" class="btn primary" style="background: #16a34a;">📥 Exportar todo</button>
-          </div>
-          <span id="importMessage" class="form-message"></span>
-        </div>
-      </section>
-
-      <!-- MI PERFIL -->
-      <section id="profile" class="view hidden">
-        <div class="form-card" style="max-width: 600px; margin: 0 auto;">
-          <h2 class="form-title">👤 Mi Perfil</h2>
-          
-          <!-- Foto de Perfil -->
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 30px;">
-            <div id="profilePhotoContainer" class="image-preview" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; cursor: default; transition: transform 0.3s; border: 3px solid var(--accent);">
-              <img id="profilePhoto" src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23e2e8f2'/%3E%3Ccircle cx='75' cy='50' r='25' fill='%2394a3b8'/%3E%3Cpath d='M 30 150 Q 30 100 75 100 Q 120 100 120 150' fill='%2394a3b8'/%3E%3C/svg%3E" alt="Foto de perfil" style="width: 100%; height: 100%; object-fit: cover;">
-            </div>
-          </div>
-
-          <!-- Formulario de Datos -->
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <label class="form-label">
-              Nombres
-              <input type="text" id="profileNombres" class="form-control" placeholder="Ej: María Elena" maxlength="50">
-            </label>
-            <label class="form-label">
-              Apellidos
-              <input type="text" id="profileApellidos" class="form-control" placeholder="Ej: García López" maxlength="50">
-            </label>
-          </div>
-
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <label class="form-label">
-              DNI
-              <input type="text" id="profileDni" class="form-control" placeholder="Ej: 12345678" maxlength="8" pattern="[0-9]{8}">
-            </label>
-            <label class="form-label">
-              Fecha de Nacimiento
-              <input type="date" id="profileFechaNacimiento" class="form-control">
-            </label>
-          </div>
-
-          <label class="form-label">
-            📧 Correo Electrónico (Tu cuenta)
-            <input type="email" id="profileEmail" class="form-control" disabled style="background: var(--muted); cursor: not-allowed;">
-          </label>
-
-          <label class="form-label">
-            Teléfono
-            <input type="tel" id="profileTelefono" class="form-control" placeholder="Ej: +51 999 123 456" maxlength="20">
-          </label>
-
-          <!-- Botones de Acción -->
-          <div class="form-actions" style="gap: 12px;">
-            <button id="saveProfileBtn" class="btn primary" style="flex: 1;">💾 Guardar Cambios</button>
-            <button id="cancelProfileBtn" class="btn secondary" style="flex: 1;">Cancelar</button>
-          </div>
-
-          <span id="profileMessage" class="form-message" style="text-align: center; margin-top: 16px;"></span>
-        </div>
-      </section>
-
-      <!-- MODALES -->
-      <div id="addClientModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3>➕ Nuevo Cliente</h3><button class="modal-close" id="closeAddClientModal">&times;</button></div><div class="modal-body"><label class="form-label">Nombre del Cliente <input type="text" id="newClientName" class="form-control" maxlength="100" placeholder="Ej: Farmacia Ejemplo" /></label><label class="form-label">RUC <input type="text" id="newClientRuc" class="form-control" maxlength="11" placeholder="Ej: 20123456789" /></label><label class="form-label">Contacto / Teléfono <input type="text" id="newClientContact" class="form-control" placeholder="+51 999 123 456" /></label><label class="form-label">Email <input type="email" id="newClientEmail" class="form-control" placeholder="cliente@ejemplo.com" /></label><label class="form-label">Dirección <input type="text" id="newClientAddress" class="form-control" placeholder="Av. Principal 123" /></label><label class="form-label">URL del Logo <input type="url" id="newClientImageUrl" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="newClientImagePreview" class="image-preview hidden"><img id="newClientPreviewImg" src="" alt="preview" style="max-height: 100px;" /></div><span id="addClientMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelAddClientBtn" class="btn secondary">Cancelar</button><button id="confirmAddClientBtn" class="btn primary">Crear Cliente</button></div></div></div>
-      <div id="addProductModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3>➕ Nuevo Producto</h3><button class="modal-close" id="closeAddProductModal">&times;</button></div><div class="modal-body"><label class="form-label">Nombre del Producto <input type="text" id="newProductName" class="form-control" maxlength="100" placeholder="Ej: Producto X" /></label><label class="form-label">Presentación <input type="text" id="newProductPresentation" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label><label class="form-label">Detalle / Descripción <textarea id="newProductDescription" class="form-control" rows="3"></textarea></label><label class="form-label">VVF (S/) <input type="number" step="0.01" id="newProductVVF" class="form-control" placeholder="0.00" /></label><label class="form-label">Dcto. Base (%) <input type="number" step="any" id="newProductDctoBase" class="form-control" placeholder="0" /></label><label class="form-label">PVF (S/) <input type="number" step="0.01" id="newProductPVF" class="form-control" placeholder="0.00" /></label><label class="form-label">URL de la Imagen <input type="url" id="newProductImageUrl" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="newProductImagePreview" class="image-preview hidden"><img id="newProductPreviewImg" src="" alt="preview" /></div><span id="addProductMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelAddProductBtn" class="btn secondary">Cancelar</button><button id="confirmAddProductBtn" class="btn primary">Crear Producto</button></div></div></div>
-      <div id="uploadModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content"><div class="modal-header"><h3>Agregar Imagen de Producto</h3><button class="modal-close" id="closeUploadModal">&times;</button></div><div class="modal-body"><label class="form-label">Seleccionar Producto <select id="uploadProductSelect" class="form-control"></select></label><label class="form-label">URL de la Imagen <input id="imageUrlInput" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="imagePreview" class="image-preview hidden"><img id="previewImg" src="" alt="preview" /></div><span id="uploadMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelUploadBtn" class="btn secondary">Cancelar</button><button id="confirmUploadBtn" class="btn primary">Guardar Imagen</button></div></div></div>
-      <div id="featuredProductPreviewModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>📦 Producto</h3><button class="modal-close" id="closeFeaturedPreviewModal">&times;</button></div><div class="modal-body"><div id="featuredPreviewImage" class="image-preview" style="margin-bottom: 20px; text-align: center;"><img id="featuredPreviewImg" src="" alt="producto" style="max-height: 200px; object-fit: contain;" /></div><div style="display: grid; gap: 12px;"><div><div class="form-label" style="font-weight: 500; margin-bottom: 4px;">Nombre del Producto</div><div style="color: var(--text); font-size: 15px;">–</div><div id="featuredPrevName">–</div></div><div><div class="form-label" style="font-weight: 500; margin-bottom: 4px;">Presentación</div><div id="featuredPrevPresentation">–</div></div><div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;"><div><div class="form-label" style="font-weight: 500; margin-bottom: 4px;">VVF</div><div id="featuredPrevVVF" style="color: var(--accent); font-weight: 600;">–</div></div><div><div class="form-label" style="font-weight: 500; margin-bottom: 4px;">Dcto. Base</div><div id="featuredPrevDcto" style="color: var(--accent); font-weight: 600;">–</div></div><div><div class="form-label" style="font-weight: 500; margin-bottom: 4px;">PVF</div><div id="featuredPrevPVF" style="color: var(--accent); font-weight: 600;">–</div></div></div></div></div><div class="modal-footer"><button id="closeFeaturedPreviewBtn" class="btn primary">Cerrar</button></div></div></div>
-      <div id="productDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Producto</h3><button class="modal-close" id="closeDetailModal">&times;</button></div><div class="modal-body"><div id="productImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="productDetailImg" src="" alt="producto" /></div><label class="form-label">URL de la Imagen <input id="productDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/imagen.jpg" /></label><div id="detailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="detailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Producto <input id="productDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">Presentación <input id="productDetailPresentation" type="text" maxlength="100" class="form-control" placeholder="Ej: CAJA X 30 SOBRES" /></label><label class="form-label">Detalle / Descripción <textarea id="productDetailDescription" class="form-control" rows="4" style="resize: vertical; font-family: inherit;"></textarea></label><div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;"><label class="form-label">VVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailVVF" /></label><label class="form-label">Dcto. Base (%) <input type="number" step="any" class="form-control" id="productDetailDctoBase" /></label><label class="form-label">PVF (S/) <input type="number" step="0.01" class="form-control" id="productDetailPVF" /></label></div><span id="detailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelDetailBtn" class="btn secondary">Cancelar</button><button id="saveDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
-      <div id="clientDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>Detalles del Cliente</h3><button class="modal-close" id="closeClientDetailModal">&times;</button></div><div class="modal-body"><div id="clientImagePreview" class="image-preview" style="margin-bottom: 16px;"><img id="clientDetailImg" src="" alt="cliente" /></div><label class="form-label">URL de Logo/Imagen <input id="clientDetailImageUrl" type="url" class="form-control" placeholder="https://ejemplo.com/logo.png" /></label><div id="clientDetailImagePreview" class="image-preview hidden" style="margin-bottom: 16px;"><img id="clientDetailPreviewImg" src="" alt="preview" /></div><label class="form-label">Nombre del Cliente <input id="clientDetailName" type="text" maxlength="100" class="form-control" /></label><label class="form-label">RUC <input type="text" id="clientDetailRuc" class="form-control" maxlength="11" placeholder="Ej: 20123456789" /></label><label class="form-label">Contacto / Teléfono <input id="clientDetailContact" type="text" maxlength="100" class="form-control" placeholder="Ej: +51 999 123 456" /></label><label class="form-label">Email <input id="clientDetailEmail" type="email" maxlength="100" class="form-control" /></label><label class="form-label">Dirección <input id="clientDetailAddress" type="text" maxlength="100" class="form-control" /></label><span id="clientDetailMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelClientDetailBtn" class="btn secondary">Cancelar</button><button id="saveClientDetailBtn" class="btn primary">Guardar Cambios</button></div></div></div>
-      <div id="saleDetailModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Detalles de Venta</h3><button class="modal-close" id="closeSaleDetailModal">&times;</button></div><div class="modal-body"><div class="form-label"><strong>Cliente:</strong> <span id="saleDetailCliente">—</span></div><div class="form-label"><strong>Producto:</strong> <span id="saleDetailProducto">—</span></div><div class="form-label"><strong>Cantidad:</strong> <span id="saleDetailCantidad">—</span></div><div class="form-label"><strong>Precio Unitario:</strong> <span id="saleDetailPrecio">—</span></div><div class="form-label"><strong>Total:</strong> <span id="saleDetailTotal">—</span></div><div class="form-label"><strong>Fecha de Venta:</strong> <span id="saleDetailFecha">—</span></div><div class="form-label"><strong>Lote:</strong> <span id="saleDetailLote">—</span></div><div class="form-label"><strong>Fecha Vencimiento:</strong> <span id="saleDetailVencimiento">—</span></div></div><div class="modal-footer"><button id="closeSaleDetailBtn" class="btn secondary">Cerrar</button></div></div></div>
-      <div id="editSaleModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3>Editar Venta</h3><button class="modal-close" id="closeEditSaleModal">&times;</button></div><div class="modal-body"><input type="hidden" id="editSaleId" /><label class="form-label">Cliente <select id="editClienteId" class="form-control"></select></label><label class="form-label">Producto <select id="editProductoId" class="form-control"></select></label><label class="form-label">Imagen del producto <div id="editProductImagePreview" class="image-preview" style="width: 80px; height: 80px; margin-top: 5px;"><img id="editProductImg" src="" alt="Producto" style="width: 100%; height: 100%; object-fit: contain;" /></div></label><label class="form-label">Cantidad <input type="number" step="1" min="1" id="editCantidad" class="form-control" /></label><label class="form-label">Lote <input type="text" maxlength="50" id="editLote" class="form-control" /></label><label class="form-label">Fecha Vencimiento <input type="date" id="editFechaVencimiento" class="form-control" /></label><label class="form-label">Precio Unitario (S/) <input type="number" step="0.01" min="0.01" id="editPrecioVenta" class="form-control" /></label><span id="editSaleMessage" class="form-message"></span></div><div class="modal-footer"><button id="cancelEditSaleBtn" class="btn secondary">Cancelar</button><button id="saveEditSaleBtn" class="btn primary">Guardar Cambios</button></div></div></div>
-      <div id="topClientsModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>🏆 Top 5 clientes (ventas totales)</h3><button class="modal-close" id="closeTopClientsModal">&times;</button></div><div class="modal-body"><canvas id="topClientsExpandedChart" style="max-height: 500px; width: 100%;"></canvas></div><div class="modal-footer"><button id="closeTopClientsBtn" class="btn primary">Cerrar</button></div></div></div>
-      <div id="quotaModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>📊 Meta del mes - Vista Detallada</h3><button class="modal-close" id="closeQuotaModal">&times;</button></div><div class="modal-body"><div style="display: flex; gap: 20px; align-items: flex-start;"><div style="flex: 1; min-height: 400px;"><canvas id="quotaExpandedChart" style="max-height: 400px; width: 100%;"></canvas></div><div style="display: flex; flex-direction: column; gap: 16px; min-width: 200px;"><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Meta establecida</div><div class="quota-stat-value">S/<span id="quotaModalMetaValue">0.00</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Ventas realizadas</div><div class="quota-stat-value">S/<span id="quotaModalSalesValue">0.00</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Progreso</div><div class="quota-stat-value quota-progress-text"><span id="quotaModalProgressValue">0%</span></div></div><div class="quota-stat" style="padding: 12px;"><div class="quota-stat-label">Falta por vender</div><div class="quota-stat-value">S/<span id="quotaModalMissingValue">0.00</span></div></div></div></div></div><div class="modal-footer"><button id="closeQuotaBtn" class="btn primary">Cerrar</button></div></div></div>
-      <div id="salesChartModal" class="modal hidden"><div class="modal-overlay"></div><div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;"><div class="modal-header"><h3>📈 Tendencia de ventas - Vista detallada</h3><button class="modal-close" id="closeSalesChartModal">&times;</button></div><div class="modal-body"><canvas id="salesChartExpanded" style="max-height: 500px; width: 100%;"></canvas></div><div class="modal-footer"><button id="closeSalesChartBtn" class="btn primary">Cerrar</button></div></div></div>
-      <div id="recomprasModal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
-          <div class="modal-header"><h3>📅 Listado de Recompras Estimadas</h3><button class="modal-close" id="closeRecomprasModal">&times;</button></div>
-          <div class="modal-body"><div id="recomprasFullGrid" class="recompras-grid" style="display: grid; gap: 10px;"></div></div>
-          <div class="modal-footer"><button id="closeRecomprasBtn" class="btn primary">Cerrar</button></div>
-        </div>
-      </div>
-
-      <footer class="animated-footer">
-        <div class="footer-content">
-          <span class="footer-text">Todos los derechos reservados</span>
-          <span class="footer-author">© Ismael Zamora</span>
-        </div>
-      </footer>
-    </main>
-  </div>
+        // Cambiar clase active en botones
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Mostrar panel correspondiente
+        panels.forEach(panel => {
+          panel.classList.remove('active');
+          if (panel.id === `tab-${tabId}`) {
+            panel.classList.add('active');
+          }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

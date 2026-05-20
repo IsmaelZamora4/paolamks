@@ -12,7 +12,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const storage = firebase.storage();
+const storage = firebase.storage(); 
 const auth = firebase.auth();
 
 // Nueva configuración de caché recomendada
@@ -20,7 +20,8 @@ db.settings({
   cache: {
     persistence: 'indexeddb',
     synchronizeTabs: true // Habilita la sincronización entre múltiples pestañas
-  }
+  },
+  merge: true
 });
 
 // Opcional: Si quieres mantener el manejo de errores de persistencia, puedes usar esto:
