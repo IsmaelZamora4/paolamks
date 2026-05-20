@@ -15,7 +15,9 @@ function initAuth() {
             const path = window.location.pathname;
             // Prevenir bucles: Si el usuario ya está logueado y está en páginas de acceso, ir al dashboard
             if (path.includes('login.html') || path.includes('index.html') || path === '/' || !path.includes('dashboard')) {
-                window.location.replace(window.location.origin + '/public/dashboard.html');
+                // Si en Vercel 'public' es la raíz, usa solo '/dashboard.html'
+                const target = path.includes('/public/') ? '/public/dashboard.html' : '/dashboard.html';
+                window.location.replace(window.location.origin + target);
                 return;
             }
 
@@ -57,7 +59,9 @@ function initAuth() {
             const path = window.location.pathname;
             // Ajustado para detectar el archivo físico o la ruta virtual
             if (path.includes('/dashboard/') || path.includes('dashboard.html')) {
-                window.location.replace(window.location.origin + '/public/login.html');
+                // Ajuste dinámico para la ruta de login
+                const target = path.includes('/public/') ? '/public/login.html' : '/login.html';
+                window.location.replace(window.location.origin + target);
                 return;
             }
             
