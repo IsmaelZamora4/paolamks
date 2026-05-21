@@ -14,7 +14,7 @@ function initAuth() {
             // Si estamos en la página de login, redirigir al dashboard
             const path = window.location.pathname;
             // Prevenir bucles: Si el usuario ya está logueado y está en páginas de acceso, ir al dashboard
-            if (path.includes('login.html') || path.includes('index.html') || path === '/' || !path.includes('dashboard')) {
+            if (path.includes('login.html') || path.includes('index.html') || path === '/' || (!path.includes('dashboard') && !path.includes('index.html'))) {
                 window.location.replace('/dashboard.html');
                 return;
             }
