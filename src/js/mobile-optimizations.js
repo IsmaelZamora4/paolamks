@@ -140,23 +140,9 @@
     }, { passive: true });
   };
 
-  // Prevenir comportamiento de pull-to-refresh en Android
+  // Prevenir comportamiento de pull-to-refresh en navegadores móviles sin bloquear el scroll nativo
   const preventPullToRefresh = () => {
-    let pullStartY = 0;
-    
-    document.addEventListener('touchstart', (e) => {
-      pullStartY = e.touches[0].clientY;
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-      const touchY = e.touches[0].clientY;
-      const isDraggingDown = touchY > pullStartY;
-      
-      if (isDraggingDown && window.scrollY === 0) {
-        // Está intentando hacer pull-to-refresh
-        e.preventDefault();
-      }
-    }, { passive: false });
+    document.body.style.overscrollBehaviorY = 'none';
   };
 
   // Manejar teclado virtual en iOS
@@ -171,13 +157,7 @@
           }, 300);
         }
       });
-
-      document.addEventListener('focusout', () => {
-        // Restaurar scroll cuando se cierra el teclado
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-        }, 100);
-      });
+      // Se elimina el focusout con window.scrollTo(0,0) porque causaba que la pantalla rebotara hacia arriba al hacer scroll
     }
   };
 

@@ -705,6 +705,24 @@ onFirebaseReady(() => {
       document.getElementById('profileEmail').value = user.email || '';
       document.getElementById('profileTelefono').value = profileData.telefono || '';
 
+      // Cargar datos de proveedor (para contraseña)
+      const providers = user.providerData.map(p => p.providerId);
+      const hasPassword = providers.includes('password');
+      const currentPasswordWrapper = document.getElementById('currentPasswordWrapper');
+      const currentPassNote = document.getElementById('currentPassNote');
+
+      if (!hasPassword) {
+        if (currentPasswordWrapper) currentPasswordWrapper.style.display = 'none';
+        if (currentPassNote) {
+           currentPassNote.textContent = 'Has iniciado sesión con Google. Puedes crear una contraseña llenando los campos a continuación.';
+           currentPassNote.style.display = 'block';
+        }
+      } else {
+        if (currentPasswordWrapper) currentPasswordWrapper.style.display = 'block';
+        if (currentPassNote) {
+           currentPassNote.style.display = 'none';
+        }
+      }
       // Cargar foto de perfil
       if (profileData.photo) {
         document.getElementById('profilePhoto').src = profileData.photo;
@@ -778,8 +796,104 @@ onFirebaseReady(() => {
     }
   }
 
+  async function changePassword() {
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        showToast('❌ Usuario no autenticado', 'error');
+        return;
+      }
+
+      const currentPassInput = document.getElementById('profileCurrentPassword');
+      const newPassInput = document.getElementById('profileNewPassword');
+      const confirmPassInput = document.getElementById('profileConfirmPassword');
+      const msg = document.getElementById('passwordMessage');
+
+      const providers = user.providerData.map(p => p.providerId);
+      const hasPassword = providers.includes('password');
+
+      const currentPass = currentPassInput ? currentPassInput.value : '';
+      const newPass = newPassInput ? newPassInput.value : '';
+      const confirmPass = confirmPassInput ? confirmPassInput.value : '';
+
+      if (hasPassword && !currentPass) {
+        showToast('⚠️ Debes ingresar tu contraseña actual', 'warning');
+        return;
+      }
+
+      if (!newPass || newPass.length < 6) {
+        showToast('⚠️ La nueva contraseña debe tener al menos 6 caracteres', 'warning');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showToast('⚠️ Las contraseñas nuevas no coinciden', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('changePasswordBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Actualizando...';
+      }
+
+      // Si tiene password, re-autenticamos primero
+      if (hasPassword) {
+        const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPass);
+        try {
+          await user.reauthenticateWithCredential(credential);
+        } catch (authErr) {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Actualizar Contraseña';
+          }
+          console.error('Error reautenticando:', authErr);
+          showToast('❌ Contraseña actual incorrecta', 'error');
+          return;
+        }
+      }
+
+      // Actualizar la contraseña en Firebase Auth
+      await user.updatePassword(newPass);
+      
+      // Limpiar campos
+      if (currentPassInput) currentPassInput.value = '';
+      if (newPassInput) newPassInput.value = '';
+      if (confirmPassInput) confirmPassInput.value = '';
+
+      // Si se acaba de establecer un password por primera vez a un usuario de Google
+      if (!hasPassword) {
+         // Recargamos la vista de perfil para que detecte el nuevo provider "password"
+         await user.reload(); // Asegurar que Firebase actualice user.providerData en local
+         loadProfileView();
+      }
+
+      if (msg) {
+        msg.textContent = '✅ Contraseña actualizada correctamente';
+        msg.style.color = 'var(--accent)';
+        setTimeout(() => msg.textContent = '', 4000);
+      }
+      showToast('✅ Contraseña actualizada correctamente', 'success');
+
+    } catch (err) {
+      console.error('Error cambiando contraseña:', err);
+      let errorMsg = 'Error al cambiar contraseña';
+      if (err.code === 'auth/requires-recent-login') {
+         errorMsg = 'Debes volver a iniciar sesión para cambiar la contraseña (por seguridad).';
+      }
+      showToast('❌ ' + errorMsg, 'error');
+    } finally {
+      const btn = document.getElementById('changePasswordBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Actualizar Contraseña';
+      }
+    }
+  }
+
   // Event Listeners para Perfil
   document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
+  document.getElementById('changePasswordBtn')?.addEventListener('click', changePassword);
   document.getElementById('cancelProfileBtn')?.addEventListener('click', () => {
     loadProfileView(); // Recarga los datos originales
     showToast('✅ Cambios cancelados', 'info');
