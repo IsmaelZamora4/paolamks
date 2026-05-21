@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Farmacéuticos Markos" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" />
   <meta name="format-detection" content="telephone=no" />
-  <title>MKS DashBoard - Login</title>
+  <title>MKS DashBoard - Registro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/css/style.css" />
@@ -61,10 +61,19 @@
       <div class="auth-form-side">
         <div class="auth-card-premium">
           <a href="/" class="back-home-btn" title="Regresar al inicio">🏠</a>
-          <h2 id="authTitle">Bienvenido</h2>
-          <p class="auth-card-subtitle">Ingresa tus credenciales para continuar</p>
+          <h2 id="authTitle">Crear Nueva Cuenta</h2>
+          <p class="auth-card-subtitle">Completa tus datos para registrarte</p>
           
-          <form id="loginForm">
+          <form id="registerForm">
+            <!-- Campos de registro optimizados -->
+            <div id="registerExtraFields" class="registration-grid">
+              <div class="input-group-premium"><input type="text" id="regNombre" required><label>Nombre</label></div>
+              <div class="input-group-premium"><input type="text" id="regApellido" required><label>Apellido</label></div>
+              <div class="input-group-premium full"><input type="date" id="regBirth" required><label>Fecha de Nacimiento</label></div>
+              <div class="input-group-premium"><input type="tel" id="regTel" required><label>Celular</label></div>
+              <div class="input-group-premium"><input type="text" id="regDni" maxlength="8" required><label>DNI</label></div>
+            </div>
+
             <div class="input-group-premium">
               <input type="email" id="authEmail" required>
               <label>Correo electrónico</label>
@@ -83,22 +92,13 @@
             </div>
 
             <button type="submit" id="btnAuthMain" class="btn-premium primary-gradient">
-              <span class="btn-text">Entrar al Panel</span>
+              <span class="btn-text">Completar Registro</span>
               <div class="btn-loader hidden"></div>
             </button>
           </form>
 
-          <div class="auth-separator">
-            <span>o continúa con</span>
-          </div>
-
-          <button id="btnGoogleAuth" class="btn-premium google-white">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
-            Google
-          </button>
-
           <p class="auth-switch">
-            ¿No tienes cuenta? <a href="/register">Regístrate ahora</a>
+            ¿Ya tienes cuenta? <a href="/login">Ingresa aquí</a>
           </p>
         </div>
       </div>

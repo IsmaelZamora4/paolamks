@@ -380,6 +380,26 @@
       border-color: rgba(0, 240, 255, 0.5);
     }
 
+    /* Scroll Reveal Animation Styles */
+    .reveal-on-scroll {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 1s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                  transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+      will-change: opacity, transform;
+    }
+
+    .reveal-on-scroll.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .delay-100 { transition-delay: 100ms; }
+    .delay-200 { transition-delay: 200ms; }
+    .delay-300 { transition-delay: 300ms; }
+    .delay-400 { transition-delay: 400ms; }
+    .delay-500 { transition-delay: 500ms; }
+
     .feature-card-landing h3 {
       font-size: 1.3rem;
       margin-bottom: 12px;
@@ -531,7 +551,7 @@
 
   <!-- Navbar -->
   <nav class="navbar">
-    <div class="nav-logo" onclick="window.location.href='/index.html'">
+    <div class="nav-logo" onclick="window.location.href='/'">
       <img src="/assets/mks.png" alt="MKS Logo" onerror="this.style.display='none'">
       MKS Dashboard
     </div>
@@ -540,12 +560,10 @@
       <a href="#features">Características</a>
       <a href="#details">Explora</a>
       <a href="#contact">Contacto</a>
-      <a href="#privacy">Privacidad</a>
-      <a href="#terms">Términos</a>
     </div>
     <div class="nav-actions">
-      <a href="/login.html" class="btn-landing btn-outline">Iniciar sesión</a>
-      <a href="/login.html" class="btn-landing btn-primary">Comenzar</a>
+      <a href="/register" class="btn-landing btn-outline">Registrar</a>
+      <a href="/login" class="btn-landing btn-primary">Comenzar</a>
     </div>
   </nav>
 
@@ -557,17 +575,17 @@
           <div class="badge-dot"></div>
           Plataforma para farmacéuticos
         </div>
-        <h1 class="hero-title">
+        <h1 class="hero-title reveal-on-scroll">
           Gestiona tu negocio farmacéutico en <span class="text-gradient">tiempo real</span>
         </h1>
-        <p class="hero-subtitle">
+        <p class="hero-subtitle reveal-on-scroll delay-100">
           Controla ventas, clientes, productos y más desde una sola plataforma inteligente y fácil de usar.
         </p>
-        <div class="hero-actions">
-          <a href="/login.html" class="btn-landing btn-primary">Comienza ahora</a>
+        <div class="hero-actions reveal-on-scroll delay-200">
+          <a href="/login" class="btn-landing btn-primary">Comienza ahora</a>
           <button class="btn-landing btn-secondary-landing" onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})">Conoce más</button>
         </div>
-        <div class="feature-icons-landing">
+        <div class="feature-icons-landing reveal-on-scroll delay-300">
           <div class="feature-item-landing">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             Ventas en tiempo real
@@ -594,13 +612,13 @@
 
   <!-- Features Section -->
   <section id="features" class="features-landing">
-    <div class="features-header">
+    <div class="features-header reveal-on-scroll">
       <h2 class="features-title">Todo lo que necesitas para tu farmacia</h2>
       <p class="features-subtitle">Herramientas diseñadas específicamente para optimizar la gestión de tu negocio farmacéutico.</p>
     </div>
     
     <div class="features-grid">
-      <div class="feature-card-landing card-sales">
+      <div class="feature-card-landing card-sales reveal-on-scroll">
         <div class="feature-icon-box">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
         </div>
@@ -608,7 +626,7 @@
         <p>Registro masivo de productos con control estricto de lotes y bonificaciones en una sola transacción rápida.</p>
       </div>
 
-      <div class="feature-card-landing card-stock">
+      <div class="feature-card-landing card-stock reveal-on-scroll delay-100">
         <div class="feature-icon-box">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
         </div>
@@ -616,7 +634,7 @@
         <p>Gestión centralizada de precios VVF/PVF y márgenes con visualización de inventario siempre sincronizada.</p>
       </div>
 
-      <div class="feature-card-landing card-history">
+      <div class="feature-card-landing card-history reveal-on-scroll delay-200">
         <div class="feature-icon-box">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
         </div>
@@ -624,7 +642,7 @@
         <p>Análisis de movimientos con filtros avanzados por fecha o cliente y exportación rápida de reportes a Excel.</p>
       </div>
 
-      <div class="feature-card-landing card-clients">
+      <div class="feature-card-landing card-clients reveal-on-scroll delay-300">
         <div class="feature-icon-box">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         </div>
@@ -637,7 +655,7 @@
   <!-- Sección detallada con pestañas interactivas -->
   <section id="details" class="details-section">
     <div class="details-container">
-      <div class="details-header">
+      <div class="details-header reveal-on-scroll">
         <h2>Explora cada módulo en profundidad</h2>
         <p>Descubre cómo MKS Dashboard transforma cada área de tu negocio</p>
       </div>
@@ -1035,6 +1053,25 @@
           }
         });
       });
+    });
+
+    // Lógica de Scroll Reveal con Intersection Observer
+    document.addEventListener('DOMContentLoaded', () => {
+      const observerOptions = {
+        threshold: 0.15, // Se activa cuando el 15% del elemento es visible
+        rootMargin: '0px 0px -50px 0px' // Margen inferior para que no se active justo en el borde
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target); // Dejar de observar una vez animado
+          }
+        });
+      }, observerOptions);
+
+      document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
     });
   </script>
 </body>

@@ -103,7 +103,7 @@ onFirebaseReady(() => {
     const setTheme = (isDark) => {
       document.body.classList.toggle('dark-mode', isDark);
       if (icon) icon.textContent = isDark ? '☀️' : '🌙';
-      text.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
+      if (text) text.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
       localStorage.setItem('mks_theme', isDark ? 'dark' : 'light');
       if (toggle) toggle.checked = isDark;
       
@@ -506,7 +506,6 @@ onFirebaseReady(() => {
   async function getMultiplePrices(ventas) {
     const uid = firebase.auth().currentUser?.uid;
     if (!uid) {
-      console.warn(`⚠️ getMultiplePrices: Sin usuario autenticado`);
       return {};
     }
     const keys = [...new Set(ventas.map(v => `${v.clienteId}_${v.productoId}`))];
@@ -553,9 +552,10 @@ onFirebaseReady(() => {
 
   // ─── INICIO ───────────────────────────────────────────────
   (async () => {
-    // Eliminamos la llamada inmediata a handleRoute y loadDataProgressive
-    // ya que auth.js se encargará de dispararlas una vez confirmada la sesión.
-    initDarkMode();
+    // Solo inicializar si existe el contenedor de la App (Dashboard)
+    if (document.getElementById('appView')) {
+        initDarkMode();
+    }
   })();
 
   // ─── PERFIL ───────────────────────────────────────────────
@@ -668,7 +668,8 @@ onFirebaseReady(() => {
       const firstApellido = apellidosArr[0] || '';
       const shortName = `${firstNombre} ${firstApellido}`.trim();
 
-      document.getElementById('subtitleWelcome').textContent = `Bienvenida, ${shortName} · Farmacéuticos Markos`;
+      const subtitle = document.getElementById('subtitleWelcome');
+      if (subtitle) subtitle.textContent = `Bienvenida, ${shortName} · Farmacéuticos Markos`;
     } catch (err) {
       console.warn('No se pudo actualizar el saludo:', err);
     }
@@ -678,7 +679,8 @@ onFirebaseReady(() => {
     try {
       const photo = document.getElementById('profilePhoto').src;
       if (photo && photo !== fallbackImg) {
-        document.getElementById('profileImg').src = photo;
+        const topbarImg = document.getElementById('profileImg');
+        if (topbarImg) topbarImg.src = photo;
       }
     } catch (err) {
       console.warn('Error sincronizando foto:', err);
@@ -735,6 +737,7 @@ onFirebaseReady(() => {
       console.log('✅ Perfil cargado correctamente');
     } catch (err) {
       console.error('Error cargando perfil:', err);
+      if (typeof showToast === 'function')
       showToast('⚠️ Error al cargar datos del perfil', 'warning');
     }
   }
@@ -776,7 +779,8 @@ onFirebaseReady(() => {
 
       // Guardar foto si existe
       const photo = document.getElementById('profilePhoto').src;
-      if (photo && photo !== fallbackImg) {
+      const profilePhoto = document.getElementById('profilePhoto');
+      if (profilePhoto && photo && photo !== fallbackImg) {
         profileData.photo = photo;
       }
 
@@ -894,21 +898,53 @@ onFirebaseReady(() => {
   // Event Listeners para Perfil
   document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
   document.getElementById('changePasswordBtn')?.addEventListener('click', changePassword);
+
+  // Lógica de visibilidad de contraseñas
+  document.querySelectorAll('.toggle-password-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault(); // Evitar comportamientos por defecto del botón
+      const targetId = this.getAttribute('data-target');
+      const input = document.getElementById(targetId);
+      if (input) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          this.textContent = '🙈'; // Cambiar icono
+        } else {
+          input.type = 'password';
+          this.textContent = '👁️'; // Cambiar icono original
+        }
+      }
+    });
+  });
   document.getElementById('cancelProfileBtn')?.addEventListener('click', () => {
     loadProfileView(); // Recarga los datos originales
     showToast('✅ Cambios cancelados', 'info');
   });
 
   // Logout
-  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     if (confirm('¿Cerrar sesión?')) {
-      firebase.auth().signOut().then(() => {
+      try {
+        // 1. Limpiar estado en memoria
+        clientsCache = [];
+        productsCache = [];
+        ventasCache = [];
+        priceCache = {};
+        quotaMeta = 0;
+        
+        // 2. Limpiar base de datos local (IndexedDB)
+        if (window.PerformanceOptimizer && typeof window.PerformanceOptimizer.clearCache === 'function') {
+          await window.PerformanceOptimizer.clearCache();
+        }
+
+        // 3. Cerrar sesión en Firebase
+        await firebase.auth().signOut();
         console.log('✅ Sesión cerrada');
-        window.location.href = '/login.html';
-      }).catch(err => {
+        window.location.href = '/login';
+      } catch (err) {
         console.error('Error al cerrar sesión:', err);
         showToast('❌ Error al cerrar sesión', 'error');
-      });
+      }
     }
   });
 

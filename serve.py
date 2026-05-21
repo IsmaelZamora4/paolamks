@@ -17,7 +17,11 @@ class SPARequestHandler(http.server.SimpleHTTPRequestHandler):
         if rel_path.startswith('/dashboard/'):
             self.path = '/dashboard.html'
         elif not os.path.exists(self.translate_path(self.path)) and not '.' in os.path.basename(rel_path):
-            if rel_path == '/':
+            # Intentamos servir el archivo .html correspondiente si existe
+            potential_html = rel_path.rstrip('/') + ".html"
+            if os.path.exists(self.translate_path(potential_html)):
+                self.path = potential_html
+            elif rel_path == '/' or rel_path == '':
                 self.path = '/index.html'
             else:
                 self.path = '/dashboard.html'

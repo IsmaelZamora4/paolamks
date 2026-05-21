@@ -276,11 +276,26 @@
           <p id="currentPassNote" style="font-size:12px;color:var(--muted);margin-bottom:12px;display:none;"></p>
           <div id="passwordChangeSection" style="background: rgba(0,0,0,0.02); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
             <div id="currentPasswordWrapper">
-              <label class="form-label">Contraseña Actual <input type="password" id="profileCurrentPassword" class="form-control"></label>
+              <label class="form-label">Contraseña Actual
+                <div class="password-input-wrap">
+                  <input type="password" id="profileCurrentPassword" class="form-control">
+                  <button type="button" class="toggle-password-btn" data-target="profileCurrentPassword" title="Mostrar/Ocultar contraseña">👁️</button>
+                </div>
+              </label>
             </div>
             <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <label class="form-label">Nueva Contraseña<input type="password" id="profileNewPassword" class="form-control"></label>
-              <label class="form-label">Confirmar Contraseña<input type="password" id="profileConfirmPassword" class="form-control"></label>
+              <label class="form-label">Nueva Contraseña
+                <div class="password-input-wrap">
+                  <input type="password" id="profileNewPassword" class="form-control">
+                  <button type="button" class="toggle-password-btn" data-target="profileNewPassword" title="Mostrar/Ocultar contraseña">👁️</button>
+                </div>
+              </label>
+              <label class="form-label">Confirmar Contraseña
+                <div class="password-input-wrap">
+                  <input type="password" id="profileConfirmPassword" class="form-control">
+                  <button type="button" class="toggle-password-btn" data-target="profileConfirmPassword" title="Mostrar/Ocultar contraseña">👁️</button>
+                </div>
+              </label>
             </div>
             <button id="changePasswordBtn" class="btn secondary" style="margin-top: 16px; width: 100%; border-color: #cbd5e1;">Actualizar Contraseña</button>
             <span id="passwordMessage" class="form-message" style="text-align: center; margin-top: 8px; display: block;"></span>
