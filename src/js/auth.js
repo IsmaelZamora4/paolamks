@@ -83,6 +83,27 @@ function initAuth() {
         });
     }
 
+    // Forgot Password Handler
+    const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value.trim();
+            if (!email) {
+                if (window.showToast) window.showToast('Por favor, ingresa tu correo primero.', 'warning');
+                else alert('Por favor, ingresa tu correo primero.');
+                return;
+            }
+            try {
+                await auth.sendPasswordResetEmail(email);
+                if (window.showToast) window.showToast('Correo de recuperación enviado. Revisa tu bandeja de entrada.', 'success');
+            } catch (err) {
+                console.error("Error al enviar reset:", err);
+                if (window.showToast) window.showToast('Error: ' + err.message, 'error');
+            }
+        });
+    }
+
     // Login Form Handler
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
