@@ -2,7 +2,11 @@
   "rewrites": [
     {
       "source": "/dashboard/(.*)",
-      "destination": "/index.html"
+      "destination": "/dashboard.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dashboard.html"
     }
   ],
   "cleanUrls": true,

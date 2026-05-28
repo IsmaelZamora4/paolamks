@@ -16,7 +16,7 @@ function initAuth() {
             const isPublicPage = path === '/login' || path === '/register' || path.includes('login.html') || path.includes('register.html') || path === '/' || path.endsWith('index.html');
             
             if (isPublicPage) {
-                // Redirigir al dashboard. Vercel cargará index.html y app.js manejará el resto.
+                // Redirigir al dashboard. Vercel cargará dashboard.html y app.js manejará el resto.
                 window.location.assign('/dashboard/inicio');
                 return;
             }
