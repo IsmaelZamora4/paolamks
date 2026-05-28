@@ -1,12 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/dashboard/(.*)",
-      "destination": "/dashboard.html"
+      "source": "/dashboard/:path*",
+      "destination": "/dashboard"
     },
     {
       "source": "/dashboard",
-      "destination": "/dashboard.html"
+      "destination": "/dashboard"
     }
   ],
   "cleanUrls": true,

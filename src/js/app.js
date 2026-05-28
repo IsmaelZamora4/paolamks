@@ -159,7 +159,7 @@ onFirebaseReady(() => {
 
   function handleRoute() {
     // Evitar ejecutar el enrutamiento si no estamos en la página del dashboard (previene bucles en login.html)
-    if (!window.location.pathname.includes('dashboard.html') && !window.location.pathname.includes('/dashboard/')) return;
+    if (!window.location.pathname.includes('dashboard.html') && !window.location.pathname.startsWith('/dashboard')) return;
 
     // Solo ejecutar el enrutamiento si estamos en la vista de la aplicación (dashboard)
     if (!document.getElementById('appView') || document.getElementById('appView').classList.contains('hidden')) return;
