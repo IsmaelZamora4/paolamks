@@ -132,7 +132,7 @@ body {
 }
 
 /* ── LAYOUT ────────────────────────────────────────── */
-.app { display: flex; min-height: 100vh; align-items: flex-start; }
+.app { display: flex; min-height: 100svh; align-items: flex-start; }
 
 /* ── AUTH VIEW PREMIUM ── */
 #authView {

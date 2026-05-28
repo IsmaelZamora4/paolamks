@@ -45,15 +45,19 @@
       padding: 0;
     }
 
+    html {
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+      width: 100%;
+    }
+
     body {
       background-color: var(--bg-base);
       color: var(--text-main);
       line-height: 1.6;
       overflow-x: hidden;
-    }
-
-    html {
-      scroll-behavior: smooth;
+      width: 100%;
+      position: relative;
     }
 
     /* Ambient Glow Background */
@@ -189,7 +193,7 @@
 
     /* Hero Section */
     .hero {
-      min-height: 100vh;
+      min-height: 100svh;
       display: flex;
       align-items: center;
       padding: 120px 5% 60px;
