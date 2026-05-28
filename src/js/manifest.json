@@ -1,0 +1,36 @@
+{
+  "name": "Panel Paola - Farmacéuticos Markos",
+  "short_name": "Paola Panel",
+  "description": "Dashboard de gestión farmacéutica para Farmacéuticos Markos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/img/icons/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/icons/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Registrar Venta",
+      "url": "/dashboard/registerventa",
+      "icons": [{ "src": "/img/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Historial",
+      "url": "/dashboard/historial",
+      "icons": [{ "src": "/img/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

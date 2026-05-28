@@ -3,88 +3,20 @@
 // VERSIÓN COMPLETA + EXPORTACIÓN + FILTRO EN REGISTRO + AGRUPACIÓN POR CLIENTE
 // ============================================================
 
-/**
- * ─── PROTECCIÓN EXCLUSIVA PARA LANDING PAGE ────────────────
- * Esta sección solo se ejecuta si NO estamos en el dashboard.
- * Bloquea la descarga y apertura de imágenes del Landing para proteger el diseño.
- */
-(function() {
-  const isDashboard = window.location.pathname.includes('dashboard');
-  
-  // SOLO se ejecuta en el Landing Page (index.html)
-  if (!isDashboard) {
-    function setupImageSecurity(img) {
-      if (img.dataset.protected || img.closest('.img-security-wrapper')) return;
-
-      const applyShield = () => {
-        if (img.dataset.protected) return;
-        
-        const wrapper = document.createElement('div');
-        wrapper.className = 'img-security-wrapper'; // Clase para identificar contenedores protegidos
-        const overlay = document.createElement('div');
-        
-        const style = window.getComputedStyle(img);
-        wrapper.style.position = 'relative';
-        wrapper.style.display = style.display === 'block' ? 'block' : 'inline-block';
-        wrapper.style.verticalAlign = 'middle';
-
-        // CSS Senior: El overlay ahora usa "inset: 0" y bloquea llamadas táctiles en móviles
-        overlay.style.cssText = `
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          z-index: 999;
-          background: rgba(0,0,0,0);
-          cursor: default;
-          user-select: none;
-          -webkit-touch-callout: none;
-        `;
-        
-        img.dataset.protected = 'true';
-        // Evitamos que la propia imagen responda a eventos de puntero
-        img.style.pointerEvents = 'none'; 
-        
-        img.parentNode.insertBefore(wrapper, img);
-        wrapper.appendChild(img);
-        wrapper.appendChild(overlay);
-      };
-
-      if (img.complete) applyShield();
-      else img.addEventListener('load', applyShield);
-    }
-
-    // Bloqueo global de clic derecho en cualquier cosa relacionada con imágenes en el Landing
-    document.addEventListener('contextmenu', (e) => {
-      if (e.target.tagName === 'IMG' || e.target.closest('.img-security-wrapper')) {
-        e.preventDefault();
-      }
-    }, true);
-
-    document.addEventListener('dragstart', (e) => {
-      if (e.target.tagName === 'IMG' || e.target.closest('.img-security-wrapper')) {
-        e.preventDefault();
-      }
-    }, true);
-
-    const securityObserver = new MutationObserver(mutations => {
-      mutations.forEach(m => m.addedNodes.forEach(node => {
-        if (node.tagName === 'IMG') setupImageSecurity(node);
-        else if (node.querySelectorAll) node.querySelectorAll('img').forEach(setupImageSecurity);
-      }));
-    });
-    securityObserver.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('load', () => document.querySelectorAll('img').forEach(setupImageSecurity));
-  }
-})();
-
 function onFirebaseReady(cb) {
   if (window.db) { cb(); return; }
-  window.addEventListener('firebase-ready', cb);
-  const wait = setInterval(() => {
-    if (window.db) { clearInterval(wait); cb(); }
-  }, 200);
+  const handler = () => { if (window.db) { cb(); window.removeEventListener('firebase-ready', handler); } };
+  window.addEventListener('firebase-ready', handler);
+  const check = setInterval(() => { if (window.db) { clearInterval(check); handler(); } }, 100);
 }
 
 onFirebaseReady(() => {
+  // Early Return: No ejecutar lógica de Dashboard si no estamos en la vista de la app.
+  // Esto permite que app.js defina showToast pero no rompa la página de Login/Registro.
+  const isDashboard = window.location.pathname.includes('dashboard') || document.getElementById('appView');
+  
+  // Definición de utilidades globales (Disponibles para auth.js en cualquier página)
+  
   // ─── ESTADO GLOBAL ───────────────────────────────────────
   let clientsCache = [];
   let productsCache = [];
@@ -199,6 +131,7 @@ onFirebaseReady(() => {
   const exportFilteredBtn = document.getElementById('exportFilteredBtn');
 
   function updateExportFilteredButton() {
+    if (!exportFilteredBtn) return;
     const activeView = document.querySelector('.view:not(.hidden)')?.id;
     if (activeView === 'history') {
       exportFilteredBtn.style.display = 'inline-flex';
@@ -245,7 +178,7 @@ onFirebaseReady(() => {
     const activeBtn = Array.from(navBtns).find(b => b.dataset.view === v);
     if (activeBtn) {
       activeBtn.classList.add('active');
-      pageTitle.textContent = activeBtn.textContent.trim();
+      if (pageTitle) pageTitle.textContent = activeBtn.textContent.trim();
     }
 
     views.forEach(w => w.classList.add('hidden'));
@@ -639,17 +572,19 @@ onFirebaseReady(() => {
   async function loadProfile() {
     try {
       const user = firebase.auth().currentUser;
+      const topbarImg = document.getElementById('profileImg');
+      if (!topbarImg) return;
+
       if (!user) {
-        document.getElementById('profileImg').src = fallbackImg;
+        topbarImg.src = fallbackImg;
         return;
       }
 
       const doc = await db.collection('profile').doc(user.uid).get();
       const photoData = (doc.exists && doc.data().photo) ? doc.data().photo : fallbackImg;
-      document.getElementById('profileImg').src = photoData;
+      topbarImg.src = photoData;
     } catch (err) {
       console.error('Error al cargar perfil:', err);
-      document.getElementById('profileImg').src = fallbackImg;
     }
   }
 
@@ -1425,9 +1360,9 @@ onFirebaseReady(() => {
     const progress = quotaMeta > 0 ? (totalMes / quotaMeta) * 100 : 0;
     const progressText = formatProgressPercent(progress);
 
-    document.getElementById('quotaMetaValue').textContent = `S/${fmtMoney(quotaMeta)}`;
-    document.getElementById('quotaSalesValue').textContent = `S/${fmtMoney(totalMes)}`;
-    document.getElementById('quotaProgressValue').textContent = `${progressText}%`;
+    if (document.getElementById('quotaMetaValue')) document.getElementById('quotaMetaValue').textContent = `S/${fmtMoney(quotaMeta)}`;
+    if (document.getElementById('quotaSalesValue')) document.getElementById('quotaSalesValue').textContent = `S/${fmtMoney(totalMes)}`;
+    if (document.getElementById('quotaProgressValue')) document.getElementById('quotaProgressValue').textContent = `${progressText}%`;
 
     const ctx = canvas.getContext('2d');
     const progressColor = progress >= 100 ? 'rgba(34, 197, 94, 1)' : progress >= 75 ? 'rgba(37, 99, 235, 1)' : progress >= 50 ? 'rgba(217, 119, 6, 1)' : 'rgba(220, 38, 38, 1)';
@@ -1508,10 +1443,10 @@ onFirebaseReady(() => {
     const remaining_safe = Math.max(remaining, 0);
     const progressText = formatProgressPercent(progress);
 
-    document.getElementById('quotaModalMetaValue').textContent = fmtMoney(quotaMeta);
-    document.getElementById('quotaModalSalesValue').textContent = fmtMoney(totalMes);
-    document.getElementById('quotaModalProgressValue').textContent = `${progressText}%`;
-    document.getElementById('quotaModalMissingValue').textContent = fmtMoney(remaining_safe);
+    if (document.getElementById('quotaModalMetaValue')) document.getElementById('quotaModalMetaValue').textContent = fmtMoney(quotaMeta);
+    if (document.getElementById('quotaModalSalesValue')) document.getElementById('quotaModalSalesValue').textContent = fmtMoney(totalMes);
+    if (document.getElementById('quotaModalProgressValue')) document.getElementById('quotaModalProgressValue').textContent = `${progressText}%`;
+    if (document.getElementById('quotaModalMissingValue')) document.getElementById('quotaModalMissingValue').textContent = fmtMoney(remaining_safe);
 
     const ctx = canvas.getContext('2d');
     const progressColor = progress >= 100 ? 'rgba(34, 197, 94, 1)' : progress >= 75 ? 'rgba(37, 99, 235, 1)' : progress >= 50 ? 'rgba(217, 119, 6, 1)' : 'rgba(220, 38, 38, 1)';
@@ -1846,13 +1781,13 @@ async function registerBatchSales() {
 
   function applyFilters() {
     currentFilters = {
-      fechaDesde: document.getElementById('filterFechaDesde').value,
-      fechaHasta: document.getElementById('filterFechaHasta').value,
-      cliente: document.getElementById('filterCliente').value.toLowerCase(),
-      producto: document.getElementById('filterProducto').value.toLowerCase(),
-      lote: document.getElementById('filterLote').value.toLowerCase(),
-      venceDesde: document.getElementById('filterVenceDesde').value,
-      venceHasta: document.getElementById('filterVenceHasta').value
+      fechaDesde: document.getElementById('filterFechaDesde')?.value || null,
+      fechaHasta: document.getElementById('filterFechaHasta')?.value || null,
+      cliente: document.getElementById('filterCliente')?.value.toLowerCase() || '',
+      producto: document.getElementById('filterProducto')?.value.toLowerCase() || '',
+      lote: document.getElementById('filterLote')?.value.toLowerCase() || '',
+      venceDesde: document.getElementById('filterVenceDesde')?.value || null,
+      venceHasta: document.getElementById('filterVenceHasta')?.value || null
     };
     loadHistory();
   }
@@ -1871,6 +1806,7 @@ async function registerBatchSales() {
   async function loadHistory() {
     if (!ventasCache.length) await refreshCache();
     const container = document.querySelector('#historyTable tbody');
+    if (!container) return;
     container.innerHTML = '';
 
     // Aplicar filtros
@@ -2247,9 +2183,20 @@ async function registerBatchSales() {
       await db.collection('ventas').doc(saleId).update(updateData);
       const index = ventasCache.findIndex(v => v.id === saleId);
       if (index !== -1) ventasCache[index] = { ...ventasCache[index], ...updateData };
+
+      // ✅ Sincronizar con el caché local de IndexedDB
+      if (window.PerformanceOptimizer) {
+        try {
+          const loader = await window.PerformanceOptimizer.loadDataProgressive(db);
+          await loader.saveData('ventas', ventasCache);
+        } catch (e) { console.warn("No se pudo actualizar el caché de ventas:", e); }
+      }
+
       msg.textContent = '✓ Venta actualizada'; msg.style.color = 'var(--success)';
       showToast('Venta actualizada correctamente', 'success');
-      setTimeout(() => { document.getElementById('editSaleModal').classList.add('hidden'); loadHistory(); loadDashboard(); }, 1500);
+      // ✅ Actualizar UI inmediatamente
+      loadHistory(); loadDashboard();
+      setTimeout(() => { document.getElementById('editSaleModal').classList.add('hidden'); }, 1000);
     } catch (err) { msg.textContent = 'Error: ' + err.message; msg.style.color = 'var(--danger)'; showToast('Error al actualizar venta: ' + err.message, 'error'); }
   });
 
@@ -2339,6 +2286,7 @@ async function registerBatchSales() {
       const imgSrc = (p.imagen && !p.imagen.includes('via.placeholder')) ? p.imagen : fallbackImg;
       const card = document.createElement('div');
       card.className = 'product-card';
+      card.dataset.id = p.id; // ✅ Identificador para scroll y resaltado
       card.style.cursor = 'pointer';
       const porcentaje = ((p.dctoBase || 0) * 100).toFixed(2);
       card.innerHTML = `
@@ -2587,9 +2535,39 @@ async function registerBatchSales() {
       await db.collection('productos').doc(productId).update(updateData);
       const prod = productsCache.find(p => p.id === productId);
       if (prod) { prod.nombre = nombre; prod.presentacion = presentacion || ''; prod.descripcion = descripcion || ''; prod.vvf = vvf; prod.dctoBase = dctoBase; prod.pvf = pvf; if (imagen) prod.imagen = imagen; }
+
+      // ✅ Sincronizar con el caché de IndexedDB para que los cambios persistan tras F5
+      if (window.PerformanceOptimizer) {
+        try {
+          const loader = await window.PerformanceOptimizer.loadDataProgressive(db);
+          await loader.saveData('productos', productsCache);
+        } catch (e) { console.warn("No se pudo actualizar el caché de productos:", e); }
+      }
+
+      // ✅ Limpiar el input de búsqueda. 
+      // Esto evita que el producto "desaparezca" si le cambiaste el nombre y el filtro ya no coincide.
+      const searchInput = document.getElementById('productSearchInput');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+
       message.textContent = '✓ Guardado'; message.style.color = 'var(--success)';
       showToast('Producto actualizado correctamente', 'success');
-      setTimeout(() => { closeProductDetail(); loadProducts(); }, 1500);
+      
+      // ✅ Renderizar y realizar scroll/resaltado
+      loadProducts().then(() => {
+        setTimeout(() => {
+          const editedCard = document.querySelector(`.product-card[data-id="${productId}"]`);
+          if (editedCard) {
+            editedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            editedCard.classList.add('highlight-new');
+            // La clase se elimina sola tras 5s por la animación CSS o puedes quitarla aquí
+            setTimeout(() => editedCard.classList.remove('highlight-new'), 5000);
+          }
+        }, 100); // Micro-delay para asegurar que el DOM se procesó
+      });
+
+      setTimeout(() => { closeProductDetail(); }, 1000);
     } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; showToast('Error al guardar producto: ' + err.message, 'error'); }
     document.getElementById('saveDetailBtn').disabled = false;
   });
@@ -2644,9 +2622,20 @@ async function registerBatchSales() {
       await db.collection('clientes').doc(clientId).update(updateData);
       const cliente = clientsCache.find(c => c.id === clientId);
       if (cliente) { cliente.nombre = nombre; cliente.ruc = ruc || ''; cliente.contacto = contacto || ''; cliente.email = email || ''; cliente.direccion = direccion || ''; if (imagen) cliente.imagen = imagen; }
+
+      // ✅ Sincronizar con IndexedDB
+      if (window.PerformanceOptimizer) {
+        try {
+          const loader = await window.PerformanceOptimizer.loadDataProgressive(db);
+          await loader.saveData('clientes', clientsCache);
+        } catch (e) { console.warn("No se pudo actualizar el caché de clientes:", e); }
+      }
+
       message.textContent = '✓ Guardado'; message.style.color = 'var(--success)';
       showToast('Cliente actualizado correctamente', 'success');
-      setTimeout(() => { closeClientDetail(); loadClients(); }, 1500);
+      // ✅ Actualizar UI inmediatamente
+      loadClients();
+      setTimeout(() => { closeClientDetail(); }, 1000);
     } catch (err) { message.textContent = 'Error: ' + err.message; message.style.color = 'var(--danger)'; showToast('Error al guardar cliente: ' + err.message, 'error'); }
     document.getElementById('saveClientDetailBtn').disabled = false;
   });
@@ -2663,7 +2652,14 @@ async function registerBatchSales() {
   function normalizeText(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
   function slugify(value, fallback) { const base = normalizeText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); return base || fallback; }
   function toNumber(value) { if (value === null || value === undefined || value === '') return null; const n = parseFloat(String(value).replace(/\s+/g,'').replace(/%/g,'').replace(/,/g,'.')); return Number.isFinite(n) ? n : null; }
-  function setImportProgress(percent, stage, detail) { const clamped = Math.max(0, Math.min(100, Math.round(percent))); document.getElementById('importProgressFill').style.width = clamped + '%'; document.getElementById('importPercent').textContent = clamped + '%'; document.getElementById('importStage').textContent = stage; document.getElementById('importDetail').textContent = detail || ''; document.getElementById('importMessage').textContent = detail || stage; }
+  function setImportProgress(percent, stage, detail) { 
+    const clamped = Math.max(0, Math.min(100, Math.round(percent))); 
+    const fill = document.getElementById('importProgressFill'); if (fill) fill.style.width = clamped + '%';
+    const perc = document.getElementById('importPercent'); if (perc) perc.textContent = clamped + '%';
+    const stg = document.getElementById('importStage'); if (stg) stg.textContent = stage;
+    const dtl = document.getElementById('importDetail'); if (dtl) dtl.textContent = detail || '';
+    const msg = document.getElementById('importMessage'); if (msg) msg.textContent = detail || stage;
+  }
   async function writeInBatches(collectionName, docs, batchSize, label, onProgress) { for (let i = 0; i < docs.length; i += batchSize) { const batch = db.batch(); const slice = docs.slice(i, i + batchSize); slice.forEach(doc => batch.set(db.collection(collectionName).doc(doc.id), doc.data)); await batch.commit(); if (onProgress) onProgress(Math.min(i + slice.length, docs.length), docs.length, label); } }
   async function clearCollection(name) { const snap = await db.collection(name).get(); for (const doc of snap.docs) if (doc.ref?.delete) await doc.ref.delete(); }
   async function importExcelFile() {

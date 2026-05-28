@@ -108,39 +108,36 @@
   // ─── SKELETON SCREENS ───────────────────────────────────
   const createSkeletonKPI = () => {
     return `
-      <div class="kpi-card" style="position: relative;">
-        <div class="kpi-label" style="background: linear-gradient(90deg, #e2e8f0 25%, #f0f4f8 50%, #e2e8f0 75%); 
-                                       background-size: 200% 100%; 
-                                       animation: loading 1.5s infinite;
-                                       height: 12px; 
-                                       border-radius: 4px; 
-                                       margin-bottom: 12px;"></div>
-        <div class="kpi-value" style="background: linear-gradient(90deg, #dbeafe 25%, #e8f1ff 50%, #dbeafe 75%); 
-                                      background-size: 200% 100%; 
-                                      animation: loading 1.5s infinite;
-                                      height: 32px; 
-                                      border-radius: 6px;"></div>
+      <div class="kpi-card skeleton-container" style="position: relative; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div class="skeleton-shimmer" style="width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;"></div>
+          <div class="skeleton-shimmer" style="height: 12px; width: 60%; border-radius: 4px;"></div>
+        </div>
+        <div class="skeleton-shimmer" style="height: 36px; width: 80%; border-radius: 6px;"></div>
+        <div class="skeleton-shimmer" style="height: 10px; width: 40%; border-radius: 4px; margin-top: 10px;"></div>
       </div>
     `;
   };
 
   const createSkeletonChart = () => {
     return `
-      <div style="width: 100%; height: 250px; 
-                  background: linear-gradient(90deg, #f0f4f8 25%, #f8fafc 50%, #f0f4f8 75%); 
-                  background-size: 200% 100%; 
-                  animation: loading 1.5s infinite;
-                  border-radius: 12px;"></div>
+      <div class="skeleton-shimmer" style="width: 100%; height: 250px; border-radius: 12px; position: relative;">
+        <div style="position: absolute; bottom: 20px; left: 5%; right: 5%; display: flex; align-items: flex-end; gap: 8%; height: 70%;">
+          ${Array(8).fill(0).map((_, i) => `<div class="skeleton-shimmer" style="flex: 1; height: ${20 + Math.random() * 80}%; border-radius: 4px 4px 0 0; opacity: 0.5; animation-delay: ${i * 0.1}s"></div>`).join('')}
+        </div>
+      </div>
     `;
   };
 
   const createSkeletonCards = (count = 3) => {
-    return Array(count).fill(0).map(() => `
-      <div class="recompra-card" style="background: linear-gradient(90deg, #f0f4f8 25%, #f8fafc 50%, #f0f4f8 75%); 
-                                        background-size: 200% 100%; 
-                                        animation: loading 1.5s infinite;
-                                        height: 80px; 
-                                        border-radius: 8px;"></div>
+    return Array(count).fill(0).map((_, i) => `
+      <div class="recompra-card skeleton-container" style="height: 80px; border-radius: 8px; display: flex; align-items: center; gap: 15px; padding: 15px; animation-delay: ${i * 0.1}s">
+        <div class="skeleton-shimmer" style="width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;"></div>
+        <div style="flex: 1;">
+          <div class="skeleton-shimmer" style="height: 14px; width: 70%; border-radius: 4px; margin-bottom: 8px;"></div>
+          <div class="skeleton-shimmer" style="height: 10px; width: 40%; border-radius: 4px;"></div>
+        </div>
+      </div>
     `).join('');
   };
 

@@ -13,9 +13,11 @@ function initAuth() {
             
             const path = window.location.pathname;
             // Si el usuario ya está logueado y está en páginas de acceso público (como login o register), redirigirlo al dashboard
-            const isPublicPage = path.includes('login') || path.includes('register') || path === '/' || path.includes('index');
+            const isPublicPage = path === '/login' || path === '/register' || path.includes('login.html') || path.includes('register.html') || path === '/' || path.endsWith('index.html');
+            
             if (isPublicPage) {
-                window.location.replace('/dashboard/inicio');
+                // Usar navegación relativa para evitar conflictos de protocolo en local
+                window.location.href = '/dashboard/inicio';
                 return;
             }
 
@@ -27,27 +29,24 @@ function initAuth() {
             if (typeof handleRoute === 'function') handleRoute();
             
             // Inicializar la app con los datos del usuario (esperar a que esté disponible)
-            if (window.loadDataProgressive && typeof window.loadDataProgressive === 'function') {
-                try {
-                    await window.loadDataProgressive();
-                } catch (err) {
-                    console.error("Error en loadDataProgressive:", err);
+            const initData = async () => {
+                if (window.loadDataProgressive) {
+                    await window.loadDataProgressive().catch(e => console.error("Error cargando datos:", e));
+                    return true;
                 }
-            } else {
-                console.warn("loadDataProgressive aún no disponible, esperando...");
+                return false;
+            };
+
+            if (!await initData()) {
                 let attempts = 0;
-                const waitForFunction = setInterval(() => {
-                    if (window.loadDataProgressive && typeof window.loadDataProgressive === 'function') {
-                        clearInterval(waitForFunction);
-                        console.log("✅ loadDataProgressive disponible, ejecutando...");
-                        window.loadDataProgressive().catch(err => console.error("Error cargando datos:", err));
-                    }
+                const checkInterval = setInterval(async () => {
+                    if (await initData()) clearInterval(checkInterval);
                     attempts++;
                     if (attempts > 150) { // 30 segundos
-                        clearInterval(waitForFunction);
+                        clearInterval(checkInterval);
                         console.error("⏱️ Timeout esperando loadDataProgressive");
                     }
-                }, 200);
+                }, 100);
             }
         } else {
             window.currentUser = null;

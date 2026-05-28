@@ -21,6 +21,7 @@
   <meta property="twitter:image" content="/assets/metatag.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Estilos base del sistema -->
@@ -546,6 +547,9 @@
   </style>
 
   <script defer src="/src/js/mobile-optimizations.js"></script>
+  <script defer src="/src/js/landing-security.js"></script>
+  <script defer src="/src/js/firestore-optimizations.js"></script>
+  <script defer src="/src/js/performance-optimizer.js"></script>
   <script>window.addEventListener('load', () => document.getElementById('splashScreen')?.classList.add('hidden'));</script>
 </head>
 <body>
@@ -686,7 +690,7 @@
         <!-- Ventas -->
         <div class="detail-panel active" id="tab-ventas">
           <div class="detail-image">
-            <img src="/assets/ventas.png" alt="Módulo Ventas" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Ventas+Mockup'">
+            <img src="/assets/ventas.png" alt="Módulo Ventas" loading="lazy" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Ventas+Mockup'">
           </div>
           <div class="detail-text">
             <h3>Gestión de Ventas <span class="badge-new">Nuevo</span></h3>
@@ -704,7 +708,7 @@
         <!-- Productos -->
         <div class="detail-panel" id="tab-productos">
           <div class="detail-image">
-            <img src="/assets/productos.png" alt="Módulo Productos" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Productos+Mockup'">
+            <img src="/assets/productos.png" alt="Módulo Productos" loading="lazy" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Productos+Mockup'">
           </div>
           <div class="detail-text">
             <h3>Catálogo Inteligente</h3>
@@ -722,7 +726,7 @@
         <!-- Historial -->
         <div class="detail-panel" id="tab-historial">
           <div class="detail-image">
-            <img src="/assets/historial.png" alt="Módulo Historial" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Historial+Mockup'">
+            <img src="/assets/historial.png" alt="Módulo Historial" loading="lazy" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Historial+Mockup'">
           </div>
           <div class="detail-text">
             <h3>Historial Avanzado</h3>
@@ -740,7 +744,7 @@
         <!-- Clientes -->
         <div class="detail-panel" id="tab-clientes">
           <div class="detail-image">
-            <img src="/assets/clientes.png" alt="Módulo Clientes" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Clientes+Mockup'">
+            <img src="/assets/clientes.png" alt="Módulo Clientes" loading="lazy" onerror="this.src='https://placehold.co/600x400/0a0b14/00f0ff?text=Clientes+Mockup'">
           </div>
           <div class="detail-text">
             <h3>Panel de Clientes</h3>

@@ -26,21 +26,35 @@ document.getElementById('btnImport').addEventListener('click', async ()=>{
 
   // Subir a Firebase
   if(!window.db) return alert('Firebase no inicializado');
-  const batch = db.batch ? db.batch() : null;
+  
+  let batch = db.batch();
+  let count = 0;
+
+  const commitBatch = async () => {
+    if (count > 0) {
+      await batch.commit();
+      batch = db.batch();
+      count = 0;
+    }
+  };
 
   // Map antiguo -> firestore ids: generamos docs con auto-id
   const clienteIds = {};
   for(const c of clientes){
     const ref = db.collection('clientes').doc();
     clienteIds[c.col]=ref.id;
-    if(batch) batch.set(ref,{nombre:c.nombre}); else await ref.set({nombre:c.nombre});
+    batch.set(ref, { nombre: c.nombre });
+    count++;
+    if (count >= 500) await commitBatch();
   }
 
   const productoIds = {};
   for(const p of products){
     const ref = db.collection('productos').doc();
     productoIds[p.row]=ref.id;
-    if(batch) batch.set(ref,{nombre:p.nombre}); else await ref.set({nombre:p.nombre});
+    batch.set(ref, { nombre: p.nombre });
+    count++;
+    if (count >= 500) await commitBatch();
   }
 
   // precios
@@ -52,10 +66,12 @@ document.getElementById('btnImport').addEventListener('click', async ()=>{
       const precio = parseFloat(String(val).replace(',','.'))||0;
       const ref = db.collection('precios').doc();
       const doc = {clienteId:clienteIds[c.col],productoId:productoIds[p.row],precio};
-      if(batch) batch.set(ref,doc); else await ref.set(doc);
+      batch.set(ref, doc);
+      count++;
+      if (count >= 500) await commitBatch();
     }
   }
 
-  if(batch && batch.commit){ await batch.commit(); }
+  await commitBatch();
   alert('Importación completada');
 });

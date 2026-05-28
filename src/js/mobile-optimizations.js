@@ -12,15 +12,8 @@
            window.matchMedia("(max-width: 768px)").matches;
   };
 
-  // Prevenir el zoom doble en el navegador durante el doble tap
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) {
-      e.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, false);
+  // Prevenir el zoom doble en el navegador durante el doble tap (SIN bloquear scroll)
+  // Nota: Delegado a CSS touch-action: manipulation para mejor rendimiento.
 
   // Mejorar el scrolling en dispositivos móviles (smooth scroll)
   if (isMobile()) {
@@ -80,14 +73,9 @@
     const nav = document.querySelector('.sidebar nav');
     
     if (sidebar && nav && isMobile()) {
-      // Agregar scroll horizontal suave
-      nav.addEventListener('wheel', (e) => {
-        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-          e.preventDefault();
-          nav.scrollLeft += e.deltaY;
-        }
-      }, { passive: false });
-
+      // ✅ NO USAR wheel event con preventDefault - permite scroll nativo
+      // En su lugar, usar scroll-snap-type en CSS
+      
       // Agregar indicador de scroll
       const updateScrollIndicator = () => {
         if (nav.scrollLeft > 0) {
@@ -97,30 +85,20 @@
         }
       };
 
-      nav.addEventListener('scroll', updateScrollIndicator);
+      nav.addEventListener('scroll', updateScrollIndicator, { passive: true });
     }
   };
 
   // Manejar orientación del dispositivo
   const handleOrientationChange = () => {
     window.addEventListener('orientationchange', () => {
+      // ✅ CAMBIO: NO establecer overflow: hidden
+      // Mantener el body con overflow: auto para permitir scroll natural
+      
       // Ajustar layout cuando cambia la orientación
       const viewport = document.querySelector('meta[name="viewport"]');
       if (viewport) {
         viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover');
-      }
-
-      // Reajustar elementos en landscape
-      if (window.innerHeight < 600) {
-        document.body.style.overflow = 'hidden';
-        const mainContent = document.querySelector('.main');
-        if (mainContent) {
-          mainContent.style.maxHeight = 'calc(100vh - 60px)';
-          mainContent.style.overflowY = 'auto';
-          mainContent.style.webkitOverflowScrolling = 'touch';
-        }
-      } else {
-        document.body.style.overflow = 'auto';
       }
     });
   };
@@ -142,7 +120,8 @@
 
   // Prevenir comportamiento de pull-to-refresh en navegadores móviles sin bloquear el scroll nativo
   const preventPullToRefresh = () => {
-    document.body.style.overscrollBehaviorY = 'none';
+    // Usar 'contain' para evitar el rebote de refresco manteniendo el scroll interno
+    document.body.style.overscrollBehaviorY = 'contain';
   };
 
   // Manejar teclado virtual en iOS
